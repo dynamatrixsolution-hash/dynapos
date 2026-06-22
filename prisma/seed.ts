@@ -1,0 +1,451 @@
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("Seeding started...");
+
+  // 1. Create Business
+  const business = await prisma.business.upsert({
+    where: { slug: "dynapos-retail-demo" },
+    update: {},
+    create: {
+      name: "DynaPOS Retail Demo",
+      slug: "dynapos-retail-demo",
+      phone: "+1-555-0199",
+      email: "info@dynapos.com",
+      address: "123 Main St, New York, NY",
+      currency: "USD",
+      taxConfig: { taxName: "VAT", rate: 10 },
+      settings: {},
+    },
+  });
+
+  console.log(`Business created/found: ${business.name} (${business.id})`);
+
+  // 2. Create Subscription
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+  await prisma.subscription.upsert({
+    where: { businessId: business.id },
+    update: {},
+    create: {
+      businessId: business.id,
+      plan: "ENTERPRISE",
+      status: "ACTIVE",
+      startDate: new Date(),
+      endDate: oneYearFromNow,
+      userLimit: 50,
+      branchLimit: 10,
+    },
+  });
+
+  console.log("Subscription activated.");
+
+  // 3. Create Branches
+  const mainBranch = await prisma.branch.create({
+    data: {
+      businessId: business.id,
+      name: "Downtown Supermarket",
+      phone: "+1-555-0200",
+      address: "456 Broadway, New York, NY",
+      isMain: true,
+    },
+  });
+
+  const warehouseBranch = await prisma.branch.create({
+    data: {
+      businessId: business.id,
+      name: "Queens Warehouse",
+      phone: "+1-555-0300",
+      address: "789 Industry Blvd, Queens, NY",
+      isMain: false,
+    },
+  });
+
+  console.log(`Branches created: ${mainBranch.name}, ${warehouseBranch.name}`);
+
+  // 4. Create Users (hashed password: "admin123" for owner, "cashier123" for cashier)
+  const salt = bcrypt.genSaltSync(10);
+  const ownerHash = bcrypt.hashSync("admin123", salt);
+  const cashierHash = bcrypt.hashSync("cashier123", salt);
+
+  const owner = await prisma.user.upsert({
+    where: { email: "owner@dynapos.com" },
+    update: {},
+    create: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      name: "Alex Owner",
+      email: "owner@dynapos.com",
+      passwordHash: ownerHash,
+      role: "OWNER",
+      phone: "+1-555-0401",
+    },
+  });
+
+  const cashier = await prisma.user.upsert({
+    where: { email: "cashier@dynapos.com" },
+    update: {},
+    create: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      name: "Jane Cashier",
+      email: "cashier@dynapos.com",
+      passwordHash: cashierHash,
+      role: "CASHIER",
+      phone: "+1-555-0402",
+    },
+  });
+
+  console.log(`Users created: ${owner.email} (Owner), ${cashier.email} (Cashier)`);
+
+  // 5. Create Categories
+  const produce = await prisma.category.create({
+    data: { businessId: business.id, name: "Fresh Produce" },
+  });
+
+  const dairyBakery = await prisma.category.create({
+    data: { businessId: business.id, name: "Dairy & Bakery" },
+  });
+
+  const beveragesSnacks = await prisma.category.create({
+    data: { businessId: business.id, name: "Beverages & Snacks" },
+  });
+
+  const groceries = await prisma.category.create({
+    data: { businessId: business.id, name: "Groceries" },
+  });
+
+  const household = await prisma.category.create({
+    data: { businessId: business.id, name: "Household Goods" },
+  });
+
+  const pharmacy = await prisma.category.create({
+    data: { businessId: business.id, name: "Pharmacy" },
+  });
+
+  // 6. Create Brands
+  const genericBrand = await prisma.brand.create({
+    data: { businessId: business.id, name: "Generic/Organic" },
+  });
+
+  const dynabrand = await prisma.brand.create({
+    data: { businessId: business.id, name: "DynaBrand Retail" },
+  });
+
+  // 7. Create Units
+  const pcsUnit = await prisma.unit.create({
+    data: { businessId: business.id, name: "Pcs" },
+  });
+
+  const kgUnit = await prisma.unit.create({
+    data: { businessId: business.id, name: "Kg" },
+  });
+
+  console.log("Supermarket Categories, Brands, and Units created.");
+
+  // 8. Create Supermarket Products
+  // Produce (Weight based)
+  const bananasProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: produce.id,
+      brandId: genericBrand.id,
+      unitId: kgUnit.id,
+      name: "Organic Bananas",
+      sku: "PRO-BAN-001",
+      barcode: "000000000001",
+      description: "Fresh organic yellow bananas sold by weight",
+      costPrice: 0.8,
+      sellingPrice: 1.89,
+      wholesalePrice: 1.5,
+      alertQuantity: 50,
+    },
+  });
+
+  const tomatoesProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: produce.id,
+      brandId: genericBrand.id,
+      unitId: kgUnit.id,
+      name: "Roma Tomatoes",
+      sku: "PRO-TOM-002",
+      barcode: "000000000002",
+      description: "Vine-ripened red tomatoes sold by weight",
+      costPrice: 1.2,
+      sellingPrice: 2.99,
+      wholesalePrice: 2.5,
+      alertQuantity: 30,
+    },
+  });
+
+  const potatoesProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: produce.id,
+      brandId: genericBrand.id,
+      unitId: kgUnit.id,
+      name: "Russet Potatoes",
+      sku: "PRO-POT-003",
+      barcode: "000000000003",
+      description: "Baking russet potatoes sold by weight",
+      costPrice: 0.5,
+      sellingPrice: 1.29,
+      wholesalePrice: 0.9,
+      alertQuantity: 80,
+    },
+  });
+
+  // Dairy & Bakery (Unit items)
+  const milkProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: dairyBakery.id,
+      brandId: dynabrand.id,
+      unitId: pcsUnit.id,
+      name: "Whole Milk 1 Gallon",
+      sku: "DRY-MLK-001",
+      barcode: "000000000004",
+      description: "Vitamin D pasteurized whole milk gallon",
+      costPrice: 2.1,
+      sellingPrice: 3.89,
+      wholesalePrice: 3.2,
+      alertQuantity: 25,
+    },
+  });
+
+  const breadProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: dairyBakery.id,
+      brandId: dynabrand.id,
+      unitId: pcsUnit.id,
+      name: "Sliced White Bread",
+      sku: "BKY-BRD-002",
+      barcode: "000000000005",
+      description: "Soft sliced sandwich bread pack",
+      costPrice: 1.1,
+      sellingPrice: 2.49,
+      wholesalePrice: 2.0,
+      alertQuantity: 30,
+    },
+  });
+
+  const yogurtProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: dairyBakery.id,
+      brandId: genericBrand.id,
+      unitId: pcsUnit.id,
+      name: "Greek Yogurt 500g",
+      sku: "DRY-YGT-003",
+      barcode: "000000000006",
+      description: "Plain Greek Yogurt cup",
+      costPrice: 0.7,
+      sellingPrice: 1.59,
+      wholesalePrice: 1.2,
+      alertQuantity: 40,
+    },
+  });
+
+  // Beverages & Snacks
+  const cokeProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: beveragesSnacks.id,
+      brandId: genericBrand.id,
+      unitId: pcsUnit.id,
+      name: "Coca-Cola 12-Pack",
+      sku: "BEV-COK-001",
+      barcode: "000000000007",
+      description: "Classic Coca-Cola soda cans",
+      costPrice: 4.0,
+      sellingPrice: 6.99,
+      wholesalePrice: 5.5,
+      alertQuantity: 15,
+    },
+  });
+
+  const chipsProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: beveragesSnacks.id,
+      brandId: genericBrand.id,
+      unitId: pcsUnit.id,
+      name: "Salted Potato Chips",
+      sku: "SNK-CHP-002",
+      barcode: "000000000008",
+      description: "Crispy salted classic chips family size",
+      costPrice: 1.5,
+      sellingPrice: 3.29,
+      wholesalePrice: 2.5,
+      alertQuantity: 30,
+    },
+  });
+
+  // Household
+  const detergentProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: household.id,
+      brandId: dynabrand.id,
+      unitId: pcsUnit.id,
+      name: "Laundry Liquid Detergent",
+      sku: "HSH-DET-001",
+      barcode: "000000000012",
+      description: "Liquid fabric detergent clean breeze scent",
+      costPrice: 6.5,
+      sellingPrice: 12.99,
+      wholesalePrice: 10.0,
+      alertQuantity: 10,
+    },
+  });
+
+  // Pharmacy (Expiry & batch tracking enabled)
+  const aspirinProduct = await prisma.product.create({
+    data: {
+      businessId: business.id,
+      categoryId: pharmacy.id,
+      brandId: genericBrand.id,
+      unitId: pcsUnit.id,
+      name: "Aspirin 81mg (100 Tabs)",
+      sku: "MED-ASP-081",
+      barcode: "880303030303",
+      description: "Low dose safety coated aspirin for daily therapy",
+      costPrice: 4.2,
+      sellingPrice: 8.5,
+      wholesalePrice: 6.0,
+      alertQuantity: 10,
+      batchTracking: true,
+      expiryTracking: true,
+    },
+  });
+
+  console.log("Supermarket Products created.");
+
+  // 9. Create Product Stocks
+  await prisma.productStock.createMany({
+    data: [
+      { productId: bananasProduct.id, branchId: mainBranch.id, quantity: 500 },
+      { productId: bananasProduct.id, branchId: warehouseBranch.id, quantity: 2000 },
+      { productId: tomatoesProduct.id, branchId: mainBranch.id, quantity: 300 },
+      { productId: potatoesProduct.id, branchId: mainBranch.id, quantity: 800 },
+      { productId: milkProduct.id, branchId: mainBranch.id, quantity: 120 },
+      { productId: milkProduct.id, branchId: warehouseBranch.id, quantity: 500 },
+      { productId: breadProduct.id, branchId: mainBranch.id, quantity: 150 },
+      { productId: yogurtProduct.id, branchId: mainBranch.id, quantity: 90 },
+      { productId: cokeProduct.id, branchId: mainBranch.id, quantity: 80 },
+      { productId: chipsProduct.id, branchId: mainBranch.id, quantity: 140 },
+      { productId: detergentProduct.id, branchId: mainBranch.id, quantity: 45 },
+      { productId: aspirinProduct.id, branchId: mainBranch.id, quantity: 30 },
+    ],
+  });
+
+  // 10. Create Batches for Aspirin (batch tracking enabled)
+  const expiryDate1 = new Date();
+  expiryDate1.setFullYear(expiryDate1.getFullYear() + 2);
+  const expiryDate2 = new Date();
+  expiryDate2.setFullYear(expiryDate2.getFullYear() + 1);
+
+  await prisma.batch.createMany({
+    data: [
+      {
+        productId: aspirinProduct.id,
+        branchId: mainBranch.id,
+        batchNumber: "ASP-B01",
+        quantity: 20,
+        costPrice: 4.2,
+        sellingPrice: 8.5,
+        expiryDate: expiryDate1,
+      },
+      {
+        productId: aspirinProduct.id,
+        branchId: mainBranch.id,
+        batchNumber: "ASP-B02",
+        quantity: 10,
+        costPrice: 4.5,
+        sellingPrice: 9.0,
+        expiryDate: expiryDate2,
+      },
+    ],
+  });
+
+  console.log("Stocks & Batches created.");
+
+  // 11. Create Demo Customer & Supplier
+  const walkInCustomer = await prisma.customer.create({
+    data: {
+      businessId: business.id,
+      name: "Walk-in Customer",
+      phone: "0000000000",
+      customerType: "RETAIL",
+    },
+  });
+
+  const regularCustomer = await prisma.customer.create({
+    data: {
+      businessId: business.id,
+      name: "John Customer",
+      email: "john@customer.com",
+      phone: "+1-555-0810",
+      address: "777 Park Ave, New York, NY",
+      customerType: "WHOLESALE",
+      creditLimit: 1000.0,
+      balance: 150.0,
+    },
+  });
+
+  const demoSupplier = await prisma.supplier.create({
+    data: {
+      businessId: business.id,
+      name: "Global Distributor Inc.",
+      contactName: "Michael Supplier",
+      email: "sales@globaldist.com",
+      phone: "+1-555-0900",
+      address: "100 Logistics Rd, Newark, NJ",
+      balance: 500.0,
+    },
+  });
+
+  // Seed customer ledger entry
+  await prisma.customerLedger.create({
+    data: {
+      customerId: regularCustomer.id,
+      type: "SALE",
+      reference: "INV-2026-0001",
+      debit: 150.0,
+      credit: 0.0,
+      balance: 150.0,
+      description: "Initial wholesale credit invoice purchase",
+    },
+  });
+
+  // Seed supplier ledger entry
+  await prisma.supplierLedger.create({
+    data: {
+      supplierId: demoSupplier.id,
+      type: "PURCHASE",
+      reference: "PO-2026-0001",
+      debit: 0.0,
+      credit: 500.0,
+      balance: 500.0,
+      description: "Inbound stock invoice credit PO",
+    },
+  });
+
+  console.log("Customer & Supplier seeding completed.");
+  console.log("Seeding completed successfully!");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
