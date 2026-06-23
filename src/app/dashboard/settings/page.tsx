@@ -25,6 +25,7 @@ import {
   Calendar,
   Upload,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 
 interface AuditLogItem {
@@ -98,8 +99,10 @@ export default function SettingsPage() {
   const [barcodePrefix, setBarcodePrefix] = React.useState("");
   const [autoBarcodeGen, setAutoBarcodeGen] = React.useState(true);
 
-  // Stats and Logs
+  // Stats, Logs and Subscription
   const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>([]);
+  const [subscription, setSubscription] = React.useState<any>(null);
+  const [subMetrics, setSubMetrics] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState("");
@@ -115,10 +118,11 @@ export default function SettingsPage() {
   const loadSettings = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const [res, logsRes, branchesRes] = await Promise.all([
+      const [res, logsRes, branchesRes, subRes] = await Promise.all([
         fetch("/api/v1/settings"),
         fetch("/api/v1/settings/audit-logs"),
         fetch("/api/v1/branches"),
+        fetch("/api/v1/subscriptions"),
       ]);
 
       if (res.ok) {
@@ -186,6 +190,11 @@ export default function SettingsPage() {
       if (branchesRes.ok) {
         const data = await branchesRes.json();
         setBranches(data || []);
+      }
+      if (subRes.ok) {
+        const data = await subRes.json();
+        setSubscription(data.subscription || null);
+        setSubMetrics(data.metrics || null);
       }
     } catch (err) {
       console.error(err);
@@ -386,6 +395,7 @@ export default function SettingsPage() {
     { id: "taxation", label: "PAN / VAT Details", icon: Percent },
     { id: "currency", label: "Currency & Dates", icon: Calendar },
     { id: "pos", label: "Invoices & Billing", icon: FileText },
+    { id: "subscription", label: "Subscription Plan", icon: CreditCard },
     { id: "backup", label: "Backup & Logs", icon: Database },
   ];
 
@@ -515,12 +525,13 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="border border-border/60 rounded-xl p-4 space-y-3 mt-4">
+                 <div className="border border-border/60 rounded-xl p-4 space-y-3 mt-4">
                   <h4 className="text-xs font-bold text-foreground">Quick Setup Actions</h4>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => setActiveTab("profile")} className="px-3 py-1.5 bg-secondary hover:bg-border text-xs rounded-lg font-bold">Edit Profile</button>
                     <button type="button" onClick={() => setActiveTab("taxation")} className="px-3 py-1.5 bg-secondary hover:bg-border text-xs rounded-lg font-bold">Manage VAT</button>
                     <button type="button" onClick={() => setActiveTab("pos")} className="px-3 py-1.5 bg-secondary hover:bg-border text-xs rounded-lg font-bold">Configure Invoices</button>
+                    <button type="button" onClick={() => setActiveTab("subscription")} className="px-3 py-1.5 bg-secondary hover:bg-border text-xs rounded-lg font-bold">Subscription Plan</button>
                     <button type="button" onClick={() => setActiveTab("backup")} className="px-3 py-1.5 bg-secondary hover:bg-border text-xs rounded-lg font-bold">Download Backup</button>
                   </div>
                 </div>
@@ -1342,8 +1353,137 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* T8. SUBSCRIPTION PLAN */}
+            {activeTab === "subscription" && (
+              <div className="space-y-6">
+                <h3 className="text-sm font-black border-b border-border/50 pb-2 uppercase tracking-wider text-primary">
+                  Subscription Status & Plan Details
+                </h3>
+
+                {subscription ? (
+                  <div className="space-y-6">
+                    {/* Main subscription card */}
+                    <div className="border border-border/60 rounded-2xl p-6 relative overflow-hidden bg-gradient-to-br from-[#2563EB]/5 to-transparent">
+                      <div className="absolute top-0 right-0 h-32 w-32 bg-[#2563EB]/5 rounded-full -mr-16 -mt-16 blur-xl" />
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black bg-primary/10 text-primary px-2.5 py-1 rounded-full uppercase tracking-wider">
+                            Active Subscription
+                          </span>
+                          <h4 className="text-xl font-black mt-2 text-foreground">
+                            {subscription.plan} Plan
+                          </h4>
+                          <p className="text-xs text-muted-foreground">
+                            Registered business billing tier context.
+                          </p>
+                        </div>
+                        
+                        <div className="flex flex-col items-start md:items-end gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Plan Expiry Date</span>
+                          <span className="text-sm font-black text-foreground">
+                            {new Date(subscription.endDate).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Started: {new Date(subscription.startDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Live countdown details */}
+                      <div className="mt-6 pt-5 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl border border-border bg-secondary/10 flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-primary shrink-0" />
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Billing Cycle Status</div>
+                            <div className="text-xs font-bold text-foreground">
+                              {subscription.status === "ACTIVE" ? "Auto-renew or Active" : "Cancelled/Suspended"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-border bg-secondary/10 flex items-center gap-3">
+                          <Info className="h-5 w-5 text-amber-500 shrink-0" />
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Remaining</div>
+                            <div className="text-xs font-black text-foreground">
+                              {(() => {
+                                const end = new Date(subscription.endDate);
+                                const diff = end.getTime() - new Date().getTime();
+                                if (diff <= 0) return "Expired";
+                                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                return `${days} Days Remaining`;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Limits and quotas */}
+                    {subMetrics && (
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
+                          Resource Usage & Limits
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Branch usage */}
+                          <div className="border border-border/60 rounded-xl p-4 space-y-3">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">Branches</span>
+                              <span className="font-black text-foreground">
+                                {subMetrics.branchCount} / {subscription.branchLimit}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-[#2563EB] rounded-full transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (subMetrics.branchCount / subscription.branchLimit) * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-snug">
+                              Maximum physical branches and warehouses allowed on this tier.
+                            </p>
+                          </div>
+
+                          {/* User usage */}
+                          <div className="border border-border/60 rounded-xl p-4 space-y-3">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">Employee Accounts</span>
+                              <span className="font-black text-foreground">
+                                {subMetrics.userCount} / {subscription.userLimit}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (subMetrics.userCount / subscription.userLimit) * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-snug">
+                              Maximum employee profiles (cashiers, managers) that can login.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-12 border border-dashed border-border rounded-xl text-center text-muted-foreground space-y-2 bg-secondary/5">
+                    <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto stroke-1" />
+                    <p className="text-xs font-bold">No Subscription Found</p>
+                    <p className="text-[10px]">Contact system admin to configure your billing subscription.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Save Buttons Panel - Only shown for config fields */}
-            {activeTab !== "overview" && activeTab !== "backup" && isAuthorized && (
+            {activeTab !== "overview" && activeTab !== "backup" && activeTab !== "subscription" && isAuthorized && (
               <div className="border-t border-border/50 pt-4 flex justify-end">
                 <button
                   type="submit"

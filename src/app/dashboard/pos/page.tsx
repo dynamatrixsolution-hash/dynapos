@@ -199,10 +199,16 @@ export default function POSPage() {
   ]);
   const [currentOrderId, setCurrentOrderId] = React.useState<string>("1");
 
+  const [cartSearchQuery, setCartSearchQuery] = React.useState<string>("");
+  const [customerSearchQuery, setCustomerSearchQuery] = React.useState<string>("");
+  const [couponDiscounts, setCouponDiscounts] = React.useState<Record<string, number>>({});
+
   // Get active order context helpers
   const currentOrder = React.useMemo(() => {
     return activeOrders.find((o) => o.id === currentOrderId) || activeOrders[0];
   }, [activeOrders, currentOrderId]);
+
+  const couponDiscount = couponDiscounts[currentOrderId] || 0;
 
   // Math Calculations (CGST/SGST/VAT)
   const subtotal = currentOrder.cart.reduce(
@@ -215,6 +221,26 @@ export default function POSPage() {
     0
   );
 
+  const grossSubtotal = currentOrder.cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  const productDiscount = currentOrder.cart.reduce(
+    (sum, item) => sum + item.discount * item.quantity,
+    0
+  );
+
+  const filteredCart = React.useMemo(() => {
+    if (!cartSearchQuery.trim()) return currentOrder.cart;
+    const q = cartSearchQuery.toLowerCase();
+    return currentOrder.cart.filter((item) =>
+      item.name.toLowerCase().includes(q) ||
+      item.sku.toLowerCase().includes(q) ||
+      (item.barcode && item.barcode.toLowerCase().includes(q))
+    );
+  }, [currentOrder.cart, cartSearchQuery]);
+
   // Calculate tax dynamically based on settings
   const rawOverallDiscount =
     currentOrder.discountType === "PERCENTAGE"
@@ -225,10 +251,10 @@ export default function POSPage() {
   if (enableVat) {
     if (pricingType === "INCLUSIVE") {
       // Inclusive tax: selling price already includes the tax
-      tax = (subtotal - rawOverallDiscount) * (vatPercentage / (100 + vatPercentage));
+      tax = (subtotal - rawOverallDiscount - couponDiscount) * (vatPercentage / (100 + vatPercentage));
     } else {
       // Exclusive tax: tax is added on top of the subtotal minus overall discount
-      tax = Math.max(0, subtotal - rawOverallDiscount) * (vatPercentage / 100);
+      tax = Math.max(0, subtotal - rawOverallDiscount - couponDiscount) * (vatPercentage / 100);
     }
   }
 
@@ -239,8 +265,8 @@ export default function POSPage() {
 
   // Compute final total payable
   const total = pricingType === "INCLUSIVE"
-    ? Math.max(0, subtotal - rawOverallDiscount)
-    : Math.max(0, subtotal + tax - rawOverallDiscount);
+    ? Math.max(0, subtotal - rawOverallDiscount - couponDiscount)
+    : Math.max(0, subtotal + tax - rawOverallDiscount - couponDiscount);
 
   const roundOff = parseFloat((Math.round(total) - total).toFixed(2));
   const grandTotal = Math.round(total);
@@ -400,13 +426,13 @@ export default function POSPage() {
         if (currentOrder.cart.length > 0) window.print();
       } else if (e.key === "F8") {
         e.preventDefault();
-        if (currentOrder.cart.length > 0) {
-          setSplitType("METHOD");
-          setPayModalOpen(true);
-        }
+        if (currentOrder.cart.length > 0) openCheckout();
       } else if (e.key === "F9") {
         e.preventDefault();
-        setPosScannerOpen((prev) => !prev);
+        if (currentOrder.cart.length > 0) handleCheckoutSubmit();
+      } else if (e.key === "F10") {
+        e.preventDefault();
+        if (currentOrder.cart.length > 0) handleCheckoutSubmit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         updateCurrentOrder((o) => ({ ...o, cart: [] }));
@@ -697,7 +723,7 @@ export default function POSPage() {
         tax: i.tax,
       })),
       subtotal,
-      discount: rawOverallDiscount + discountSales,
+      discount: rawOverallDiscount + discountSales + couponDiscount,
       tax,
       total: grandTotal,
       paidAmount: totalPaidInSplits,
@@ -743,6 +769,11 @@ export default function POSPage() {
         invoiceNotes: "",
         splitPayments: { cash: 0, card: 0, qr: 0, bank: 0, credit: 0 },
       }));
+      setCouponDiscounts((prev) => {
+        const next = { ...prev };
+        delete next[currentOrderId];
+        return next;
+      });
 
       setPayModalOpen(false);
       setIsAmountTenderedManuallySet(false);
@@ -784,6 +815,11 @@ export default function POSPage() {
       overallDiscount: 0,
       invoiceNotes: "",
     }));
+    setCouponDiscounts((prev) => {
+      const next = { ...prev };
+      delete next[currentOrderId];
+      return next;
+    });
     setIsAmountTenderedManuallySet(false);
     setAmountTendered(0);
   };
@@ -874,9 +910,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className={`-m-4 md:-m-6 p-4 md:p-6 bg-[#F3F4F6] dark:bg-slate-950 overflow-hidden text-foreground flex flex-col font-sans select-none transition-all duration-300 ${
-      navbarOpen ? "h-[calc(100vh-64px)]" : "h-screen"
-    }`}>
+    <div className="w-full h-full p-4 bg-[#F3F4F6] dark:bg-slate-950 overflow-hidden text-foreground flex flex-col font-sans select-none transition-all duration-300">
       
       {/* Dynamic workspace wrapper grid */}
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden no-print">
@@ -903,30 +937,30 @@ export default function POSPage() {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search all product here..."
+                  placeholder="Search products by name, barcode..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-24 py-2.5 bg-transparent text-xs text-foreground placeholder-slate-400 focus:outline-none"
+                  className="w-full pl-11 pr-32 py-2.5 bg-transparent text-xs text-foreground placeholder-slate-400 focus:outline-none"
                   suppressHydrationWarning
                 />
+                {/* Inline Barcode Scanner button */}
+                <button
+                  type="button"
+                  onClick={() => setPosScannerOpen(true)}
+                  className="absolute right-20 text-slate-400 hover:text-[#2563EB] cursor-pointer p-1.5 transition-all"
+                  title="Scan Barcode with Camera (F9)"
+                >
+                  <Barcode className="h-4.5 w-4.5" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setDebouncedQuery(searchQuery)}
-                  className="absolute right-1 px-5 h-9 bg-[#5e50eb] hover:bg-[#4d3fd4] text-white rounded-lg font-bold text-xs cursor-pointer transition-all shadow-xs"
+                  className="absolute right-1 px-4 h-9 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg font-bold text-xs cursor-pointer transition-all shadow-xs"
                 >
                   Search
                 </button>
               </div>
-
-              {/* Camera Barcode Scanner Button */}
-              <button
-                type="button"
-                onClick={() => setPosScannerOpen(true)}
-                className="bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-11 h-11 flex items-center justify-center rounded-xl text-slate-650 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0 shadow-xs cursor-pointer transition-all"
-                title="Scan Barcode with Camera (F9)"
-              >
-                <Camera className="h-4.5 w-4.5 text-slate-500 dark:text-slate-400" />
-              </button>
 
               {/* Sliders filter settings button (matching the image filter button) */}
               <button
@@ -951,7 +985,7 @@ export default function POSPage() {
                     posMode: e.target.value as any,
                   }))
                 }
-                className="h-11 px-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-250 cursor-pointer outline-none focus:ring-1 focus:ring-[#5e50eb] transition-all"
+                className="h-11 px-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-250 cursor-pointer outline-none focus:ring-1 focus:ring-[#2563EB] transition-all"
               >
                 <option value="RETAIL">Retail / Supermarket</option>
                 <option value="PHARMACY">Pharmacy Medical</option>
@@ -978,7 +1012,7 @@ export default function POSPage() {
                 onClick={() => setCurrentOrderId(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all select-none border ${
                   tab.id === currentOrderId
-                    ? "bg-[#5e50eb] text-white border-transparent shadow-md shadow-[#5e50eb]/15"
+                    ? "bg-[#2563EB] text-white border-transparent shadow-md shadow-[#2563EB]/15"
                     : "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-650 dark:text-slate-400 border-slate-200 dark:border-slate-800"
                 }`}
               >
@@ -1007,25 +1041,25 @@ export default function POSPage() {
           </div>
 
           {/* Category Horizontal scrolling pills */}
-          <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-none shrink-0 pb-1">
+          <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-none shrink-0 pb-2">
             <button
               onClick={() => setSelectedCategory("all")}
-              className={`px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all border select-none cursor-pointer ${
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all select-none cursor-pointer ${
                 selectedCategory === "all"
-                  ? "bg-[#5e50eb] text-white border-transparent shadow-md shadow-[#5e50eb]/15"
-                  : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-405 hover:text-slate-850 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  ? "bg-[#2563EB] text-white shadow-xs"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
               }`}
             >
-              All
+              Show All
             </button>
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-5 py-2.5 text-xs font-extrabold rounded-xl whitespace-nowrap transition-all border select-none cursor-pointer ${
+                className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition-all select-none cursor-pointer ${
                   selectedCategory === cat.id
-                    ? "bg-[#5e50eb] text-white border-transparent shadow-md shadow-[#5e50eb]/15"
-                    : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-405 hover:text-slate-855 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    ? "bg-[#2563EB] text-white shadow-xs"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
                 }`}
               >
                 {cat.name}
@@ -1082,7 +1116,7 @@ export default function POSPage() {
                               {stock <= 0 ? "Out of Stock" : `${stock} available`}
                             </span>
                           </td>
-                          <td className="py-3 px-3 font-bold text-[#5e50eb] dark:text-[#7f74f7]">
+                          <td className="py-3 px-3 font-bold text-[#2563EB] dark:text-[#7f74f7]">
                             {currencySymbol}{p.sellingPrice.toFixed(2)}
                           </td>
                           {isPharmacy && (
@@ -1103,7 +1137,7 @@ export default function POSPage() {
                                 e.stopPropagation();
                                 addToCart(p);
                               }}
-                              className="px-2.5 py-1 bg-[#5e50eb] hover:bg-[#4d3fd4] text-white rounded-lg font-bold text-[10px] cursor-pointer"
+                              className="px-2.5 py-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg font-bold text-[10px] cursor-pointer"
                             >
                               + Add
                             </button>
@@ -1136,7 +1170,7 @@ export default function POSPage() {
                     <div
                       key={prod.id}
                       onClick={() => addToCart(prod)}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-3.5 flex flex-col justify-between hover:shadow-lg hover:border-[#5e50eb]/25 hover:scale-[1.01] cursor-pointer relative group transition-all duration-300"
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-3.5 flex flex-col justify-between hover:shadow-lg hover:border-[#2563EB]/25 hover:scale-[1.01] cursor-pointer relative group transition-all duration-300"
                     >
                       {/* Pharmacy Info helpers badge */}
                       {isPharmacy && (
@@ -1174,7 +1208,7 @@ export default function POSPage() {
                           setDetailsQuantity(1);
                           setIsDetailsOpen(true);
                         }}
-                        className="absolute bottom-16 right-3.5 z-10 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 p-2 rounded-full text-slate-400 hover:text-[#5e50eb] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-sm cursor-pointer"
+                        className="absolute bottom-16 right-3.5 z-10 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 p-2 rounded-full text-slate-400 hover:text-[#2563EB] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-sm cursor-pointer"
                         title="Alternative Products Suggestions"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
@@ -1195,7 +1229,7 @@ export default function POSPage() {
                               className="max-h-[85%] max-w-[85%] object-contain transition-transform group-hover:scale-105 duration-250"
                             />
                           ) : (
-                            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#5e50eb]/10 text-[#5e50eb] dark:bg-[#5e50eb]/20 dark:text-purple-400 text-xs font-black uppercase tracking-wider select-none">
+                            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#2563EB]/10 text-[#2563EB] dark:bg-[#2563EB]/20 dark:text-purple-400 text-xs font-black uppercase tracking-wider select-none">
                               {prod.name.slice(0, 2)}
                             </div>
                           )}
@@ -1206,22 +1240,27 @@ export default function POSPage() {
                       )}
 
                       {/* Product text details */}
-                      <div className="space-y-1 text-left w-full">
-                        <h4 className={`font-extrabold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2 min-h-[32px] tracking-tight ${
+                      <div className="space-y-1 text-left w-full mt-2">
+                        <h4 className={`font-extrabold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2 tracking-tight ${
                           viewMode === "compact" ? "text-[10px]" : "text-xs"
                         }`}>
                           {prod.name}
                         </h4>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold flex justify-between items-center">
-                          <span>Stock: {stock}</span>
-                          {/* Barcode Mock Badge */}
-                          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded-md font-mono text-[8px] shrink-0 select-none border border-slate-200/30 dark:border-slate-700/30">
-                            <span className="font-extrabold text-[7px] leading-none opacity-60">|||I||</span>
-                            <span>{prod.barcode ? prod.barcode.slice(-5) : "12345"}</span>
+                        <div className="flex justify-between items-center pt-1.5">
+                          <span className="text-xs font-black text-[#2563EB] dark:text-purple-400">
+                            {currencySymbol}{prod.sellingPrice.toFixed(2)}
+                          </span>
+                          
+                          {/* Circular plus button */}
+                          <div 
+                            className="w-6 h-6 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center transition-all shadow-xs shrink-0 active:scale-90"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(prod);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5 stroke-[3px]" />
                           </div>
-                        </div>
-                        <div className="text-xs font-extrabold text-[#5e50eb] dark:text-purple-400 pt-0.5">
-                          {currencySymbol}{prod.sellingPrice.toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -1255,62 +1294,111 @@ export default function POSPage() {
             <span>Cashier: {session?.user?.name?.slice(0, 16) || "Alex Owner"}</span>
           </div>
 
-          {/* Restaurant / Customer header details */}
-          <div className="space-y-3 mb-3 shrink-0">
-            <div className="flex border border-slate-200/80 dark:border-slate-800/80 rounded-xl bg-[#F9FAFB] dark:bg-slate-900/60 p-0.5 text-xs font-bold w-full select-none">
-              <button
-                type="button"
-                onClick={() => updateCurrentOrder((o) => ({ ...o, customerType: "WALK_IN", selectedCustomerId: "" }))}
-                className="flex-1 py-1.5 rounded-lg text-center transition-all duration-200 text-[10px] cursor-pointer font-bold"
-                style={{
-                  backgroundColor: currentOrder.customerType === "WALK_IN" ? "#5e50eb" : "transparent",
-                  color: currentOrder.customerType === "WALK_IN" ? "#fff" : "var(--color-muted-foreground)",
-                }}
-              >
-                Walk-in Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => updateCurrentOrder((o) => ({ ...o, customerType: "REGISTERED" }))}
-                className="flex-1 py-1.5 rounded-lg text-center transition-all duration-200 text-[10px] cursor-pointer font-bold"
-                style={{
-                  backgroundColor: currentOrder.customerType === "REGISTERED" ? "#5e50eb" : "transparent",
-                  color: currentOrder.customerType === "REGISTERED" ? "#fff" : "var(--color-muted-foreground)",
-                }}
-              >
-                Registered Mode
-              </button>
+          {/* Search customer or scan barcode input */}
+          <div className="relative mb-3 shrink-0">
+            <div className="relative flex items-center bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden h-11">
+              <input
+                type="text"
+                placeholder="Search customer or scan barcode"
+                value={customerSearchQuery}
+                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                className="w-full pl-3.5 pr-11 py-2.5 bg-transparent text-xs text-foreground placeholder-slate-400 focus:outline-none font-semibold"
+              />
+              <Search className="absolute right-3.5 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
             </div>
 
-            {currentOrder.customerType === "REGISTERED" && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-400" />
+            {/* Floating search results */}
+            {customerSearchQuery.trim() && (
+              <div className="absolute top-12 left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-48 overflow-y-auto p-1.5 space-y-1">
+                {customers
+                  .filter(
+                    (c) =>
+                      c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                      c.phone.includes(customerSearchQuery)
+                  )
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        updateCurrentOrder((o) => ({
+                          ...o,
+                          selectedCustomerId: c.id,
+                          customerType: "REGISTERED",
+                        }));
+                        setCustomerSearchQuery("");
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-200 block"
+                    >
+                      {c.name} ({c.phone || "No Phone"})
+                    </button>
+                  ))}
+                {customers.filter(
+                  (c) =>
+                    c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                    c.phone.includes(customerSearchQuery)
+                ).length === 0 && (
+                  <div className="text-center py-3 text-xs text-slate-400 font-medium">
+                    No matching customers.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Restaurant / Customer header details */}
+          <div className="space-y-3 mb-3 shrink-0">
+            {/* Dining type & Table side-by-side dropdown selectors */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="relative">
                 <select
-                  value={currentOrder.selectedCustomerId}
+                  value={currentOrder.selectedCustomerId || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "new") {
+                      setCustModalOpen(true);
+                    } else {
+                      updateCurrentOrder((o) => ({
+                        ...o,
+                        selectedCustomerId: val,
+                        customerType: val ? "REGISTERED" : "WALK_IN",
+                      }));
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 pr-8 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-xs font-semibold text-slate-500 focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="">Walk-in Customer</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                  <option value="new" className="text-[#2563EB] font-bold">+ Register New</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={currentOrder.waiterId}
                   onChange={(e) =>
                     updateCurrentOrder((o) => ({
                       ...o,
-                      selectedCustomerId: e.target.value,
+                      waiterId: e.target.value,
                     }))
                   }
-                  className="flex-1 px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-xs font-bold focus:outline-none"
+                  className="w-full px-3 py-2.5 pr-8 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-xs font-semibold text-slate-500 focus:outline-none appearance-none cursor-pointer"
                 >
-                  <option value="">Search & Select Customer</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.phone || "No Phone"})
+                  <option value="">Select Sales Person</option>
+                  {Array.from({ length: 8 }, (_, i) => `Sales Person ${String(i + 1).padStart(2, "0")}`).map((w) => (
+                    <option key={w} value={w}>
+                      {w}
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={() => setCustModalOpen(true)}
-                  className="p-1.5 bg-[#5e50eb] text-white hover:bg-[#4d3fd4] rounded-xl cursor-pointer"
-                  title="Create Customer (F2)"
-                >
-                  <UserPlus className="h-4 w-4" />
-                </button>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               </div>
-            )}
+            </div>
 
             {/* Wholesale specific customer ledger information */}
             {currentOrder.posMode === "WHOLESALE" && activeCustomer && (
@@ -1325,85 +1413,52 @@ export default function POSPage() {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Restaurant dine configuration */}
-            {currentOrder.posMode === "RESTAURANT" && (
-              <div className="space-y-2 border-t border-b border-slate-100 dark:border-slate-800 py-2.5">
-                <div className="flex gap-2">
-                  {["DINE_IN", "TAKE_AWAY", "DELIVERY"].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() =>
-                        updateCurrentOrder((o) => ({
-                          ...o,
-                          diningType: type as any,
-                        }))
-                      }
-                      className={`flex-1 py-1 text-[10px] font-bold border rounded-lg transition-colors cursor-pointer ${
-                        currentOrder.diningType === type
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "border-slate-200 dark:border-slate-800 text-slate-500"
-                      }`}
-                    >
-                      {type.replace("_", " ")}
-                    </button>
-                  ))}
-                </div>
-
-                {currentOrder.diningType === "DINE_IN" && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={currentOrder.tableNumber}
-                      onChange={(e) =>
-                        updateCurrentOrder((o) => ({
-                          ...o,
-                          tableNumber: e.target.value,
-                        }))
-                      }
-                      className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-xs font-semibold"
-                    >
-                      {Array.from({ length: 15 }, (_, i) => `Table ${String(i + 1).padStart(2, "0")}`).map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={currentOrder.waiterId}
-                      onChange={(e) =>
-                        updateCurrentOrder((o) => ({
-                          ...o,
-                          waiterId: e.target.value,
-                        }))
-                      }
-                      className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-xs font-semibold"
-                    >
-                      {Array.from({ length: 8 }, (_, i) => `Waiter ${String(i + 1).padStart(2, "0")}`).map((w) => (
-                        <option key={w} value={w}>
-                          {w}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Active order heading row */}
+          <div className="flex items-center justify-between mb-3 text-slate-800 dark:text-slate-200 shrink-0">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+              <span className="font-extrabold text-base tracking-tight">Order #{currentOrder.invoiceNumber.split("-")[1] || currentOrder.id}</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Clear Cart outline trash icon button */}
+              {currentOrder.cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Are you sure you want to clear the shopping cart?")) {
+                      updateCurrentOrder((o) => ({ ...o, cart: [] }));
+                      setIsAmountTenderedManuallySet(false);
+                      setAmountTendered(0);
+                    }
+                  }}
+                  className="p-1.5 border border-red-200 hover:bg-red-500/10 text-red-500 rounded-lg cursor-pointer transition-all"
+                  title="Clear Shopping Cart (Esc)"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Cart item listing container */}
           <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-3 min-h-0">
-            {currentOrder.cart.length === 0 ? (
+            {filteredCart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 select-none">
-                <div className="w-16 h-16 rounded-full bg-[#5e50eb]/10 dark:bg-[#5e50eb]/20 flex items-center justify-center mb-3">
-                  <ShoppingCart className="h-7 w-7 stroke-1 text-[#5e50eb] dark:text-purple-400" />
+                <div className="w-16 h-16 rounded-full bg-[#2563EB]/10 dark:bg-[#2563EB]/20 flex items-center justify-center mb-3">
+                  <ShoppingCart className="h-7 w-7 stroke-1 text-[#2563EB] dark:text-purple-400" />
                 </div>
-                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-200">Cart is empty.</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-505 mt-1 max-w-[200px] leading-relaxed">Select products to begin billing.</p>
+                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                  {cartSearchQuery ? "No matching items." : "Cart is empty."}
+                </p>
+                <p className="text-[11px] text-slate-455 dark:text-slate-500 mt-1 max-w-[200px] leading-relaxed">
+                  {cartSearchQuery ? "Refine your search query or clear it." : "Select products to begin billing."}
+                </p>
               </div>
             ) : (
-              currentOrder.cart.map((item) => {
+              filteredCart.map((item) => {
                 // Calculate dynamic soft colors for fallback avatar initials based on character code
                 const initialChar = item.name.trim().charAt(0) || "P";
                 const hue = (initialChar.charCodeAt(0) * 17) % 360;
@@ -1413,12 +1468,10 @@ export default function POSPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`group bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs hover:shadow-md transition-all duration-200 relative overflow-hidden ${
-                      item.expiryDate ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-[#5e50eb]"
-                    }`}
+                    className="group bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 hover:shadow-md transition-all duration-200 relative overflow-hidden"
                   >
-                    <div className="flex gap-3">
-                      {/* Item Thumbnail */}
+                    <div className="flex gap-3 items-start">
+                      {/* Product Image Thumbnail */}
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
                         {item.image ? (
                           <img src={item.image} alt={item.name} className="w-[90%] h-[90%] object-contain transition-transform group-hover:scale-105" />
@@ -1432,90 +1485,65 @@ export default function POSPage() {
                         )}
                       </div>
 
-                      {/* Title & metrics */}
-                      <div className="flex-1 min-w-0 text-left space-y-1">
-                        <h4 className="font-extrabold text-slate-800 dark:text-slate-200 text-xs tracking-tight truncate leading-snug">
-                          {item.name}
-                        </h4>
-
-                        {/* Chips / Badges layout */}
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400">
-                            {currencySymbol}{item.price.toFixed(2)}/unit
-                          </span>
-
-                          {item.batchNumber && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-50 dark:bg-[#5e50eb]/10 text-[#5e50eb] dark:text-purple-450 border border-purple-100/50 dark:border-[#5e50eb]/20">
-                              <Layers className="h-2.5 w-2.5 mr-0.5" />
-                              B: {item.batchNumber}
-                            </span>
-                          )}
-
-                          {item.expiryDate && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100/50 dark:border-amber-500/20">
-                              <Calendar className="h-2.5 w-2.5 mr-0.5" />
-                              Exp: {item.expiryDate}
-                            </span>
-                          )}
-
-                          {item.serialNumber && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-55 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-100/50 dark:border-sky-500/20">
-                              <Barcode className="h-2.5 w-2.5 mr-0.5" />
-                              S/N: {item.serialNumber}
-                            </span>
-                          )}
-
-                          {item.discount > 0 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100/50 dark:border-emerald-500/20">
-                              <Percent className="h-2.5 w-2.5 mr-0.5" />
-                              -{currencySymbol}{item.discount.toFixed(2)} off
-                            </span>
-                          )}
+                      {/* Name & Formula Calculations */}
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex justify-between items-start gap-1">
+                          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 text-xs tracking-tight truncate leading-snug">
+                            {item.name}
+                          </h4>
+                          
+                          {/* Outline red delete button next to name */}
+                          <button
+                            type="button"
+                            onClick={() => updateCartQty(item.id, 0)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 p-1 rounded transition-all shrink-0"
+                            title="Delete Item"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
 
-                        {/* Inline Comments/Notes */}
-                        {item.notes && (
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-950/60 rounded-lg px-2.5 py-1 mt-1.5 border-l-2 border-[#5e50eb]/55">
-                            "{item.notes}"
+                        {/* Pricing formula calculation layout: green total matching mockup */}
+                        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                          <span>{currencySymbol}{(item.price - item.discount).toFixed(2)} &times; {item.quantity}</span>
+                          <span className="text-[#10b981] font-bold">{currencySymbol}{((item.price - item.discount) * item.quantity).toFixed(2)}</span>
+                        </div>
+
+                        {/* Batch / Expiry / Serial info below the calculation line */}
+                        {(item.batchNumber || item.expiryDate || item.serialNumber) && (
+                          <div className="flex flex-wrap gap-1 mt-1 text-[8px] font-bold text-slate-400">
+                            {item.batchNumber && <span>B: {item.batchNumber}</span>}
+                            {item.expiryDate && <span>Exp: {item.expiryDate}</span>}
+                            {item.serialNumber && <span>S/N: {item.serialNumber}</span>}
                           </div>
                         )}
                       </div>
-
-                      {/* Pricing Display */}
-                      <div className="text-right shrink-0 flex flex-col justify-between items-end">
-                        <div className="text-xs font-black text-slate-805 dark:text-slate-100 tracking-tight">
-                          {currencySymbol}{((item.price - item.discount) * item.quantity).toFixed(2)}
-                        </div>
-                        <div className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                          {item.quantity} × {currencySymbol}{(item.price - item.discount).toFixed(2)}
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Quantity Stepper & Action Controls */}
-                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-2.5">
-                      {/* Pill style quantity controls */}
-                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-full border border-slate-200 dark:border-slate-800 shadow-inner">
+                    {/* Stepper & Add Notes control row */}
+                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/80 pt-3 mt-3">
+                      {/* Compact gray pill quantity controls */}
+                      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
                         <button
                           type="button"
                           onClick={() => updateCartQty(item.id, item.quantity - 1)}
-                          className="w-5.5 h-5.5 flex items-center justify-center rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 shadow-sm active:scale-95 transition-all"
+                          className="w-5 h-5 flex items-center justify-center rounded-md bg-white dark:bg-slate-900 text-slate-550 hover:text-slate-800 dark:hover:text-slate-100 shadow-xs cursor-pointer active:scale-95 transition-all font-black text-xs"
                         >
-                          <Minus className="h-3 w-3 stroke-[2.5px]" />
+                          <Minus className="h-2.5 w-2.5 stroke-[2.5px]" />
                         </button>
-                        <span className="font-extrabold text-[11px] min-w-[20px] text-center text-slate-800 dark:text-slate-250 select-none">
+                        <span className="font-extrabold text-xs min-w-[16px] text-center text-slate-800 dark:text-slate-250 select-none">
                           {item.quantity}
                         </span>
                         <button
                           type="button"
                           onClick={() => updateCartQty(item.id, item.quantity + 1)}
-                          className="w-5.5 h-5.5 flex items-center justify-center rounded-full bg-[#5e50eb] hover:bg-[#4b3ecf] text-white shadow-md hover:shadow-lg active:scale-95 transition-all"
+                          className="w-5 h-5 flex items-center justify-center rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs cursor-pointer active:scale-95 transition-all font-black text-xs"
                         >
-                          <Plus className="h-3 w-3 stroke-[2.5px]" />
+                          <Plus className="h-2.5 w-2.5 stroke-[2.5px]" />
                         </button>
                       </div>
 
-                      {/* Actions Button Bar */}
+                      {/* Actions Button Bar: only note and discount */}
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -1523,14 +1551,15 @@ export default function POSPage() {
                             const noteVal = prompt(`Add comments for ${item.name}:`, item.notes || "");
                             if (noteVal !== null) updateItemNotes(item.id, noteVal);
                           }}
-                          className={`p-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition-all ${
+                          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                             item.notes
-                              ? "bg-purple-55 dark:bg-[#5e50eb]/10 border-purple-200 dark:border-[#5e50eb]/30 text-[#5e50eb]"
-                              : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                              ? "bg-[#2563EB]/10 border-transparent text-[#2563EB] dark:text-purple-400"
+                              : "border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-500"
                           }`}
-                          title={item.notes ? "Edit Note" : "Add Note"}
+                          title="Add Item Comments"
                         >
                           <FileText className="h-3.5 w-3.5" />
+                          <span>Add Note</span>
                         </button>
 
                         <button
@@ -1542,41 +1571,15 @@ export default function POSPage() {
                             );
                             if (discVal !== null) updateItemDiscount(item.id, parseFloat(discVal) || 0);
                           }}
-                          className={`p-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition-all ${
+                          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                             item.discount > 0
-                              ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                              : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
+                              ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30 text-emerald-600"
+                              : "border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-500"
                           }`}
                           title="Item Discount"
                         >
                           <Percent className="h-3.5 w-3.5" />
-                        </button>
-
-                        {(currentOrder.posMode === "WHOLESALE" || currentOrder.posMode === "RETAIL") && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ser = prompt(`Enter tracking Serial Number:`, item.serialNumber || "");
-                              if (ser !== null) updateItemSerial(item.id, ser);
-                            }}
-                            className={`p-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition-all ${
-                              item.serialNumber
-                                ? "bg-amber-50 dark:bg-amber-500/10 border-amber-250 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
-                                : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
-                            }`}
-                            title="Add Serial Number"
-                          >
-                            <Barcode className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => updateCartQty(item.id, 0)}
-                          className="p-1.5 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/30 text-red-500 transition-all ml-1"
-                          title="Delete row"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Discount</span>
                         </button>
                       </div>
                     </div>
@@ -1585,26 +1588,25 @@ export default function POSPage() {
               })
             )}
           </div>
+
           {/* Pricing calculations details */}
           {currentOrder.cart.length > 0 && (
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-3.5 mt-auto space-y-3.5 shrink-0">
-                            {/* Splits / Payments integration inputs have been moved to the checkout popup modal */}
-
-              {/* Labeled breakdowns layout exactly matching image style */}
-              <div className="space-y-2.5 text-xs text-foreground font-semibold bg-transparent p-0.5">
-                <div className="flex justify-between items-center text-slate-450 dark:text-slate-400 font-medium">
-                  <span>Subtotal</span>
-                  <span className="text-slate-800 dark:text-slate-200 font-extrabold">{currencySymbol}{subtotal.toFixed(2)}</span>
+            <div className="border-t border-slate-200 dark:border-slate-850 pt-3 mt-auto space-y-3 shrink-0">
+              
+              {/* Labeled breakdowns layout exactly matching mockup design */}
+              <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-200 font-semibold bg-transparent px-1 py-2 border-t border-b border-slate-100 dark:border-slate-800/80 my-3">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                  <span>Sub Total :</span>
+                  <span className="text-slate-800 dark:text-slate-100 font-bold">{currencySymbol}{grossSubtotal.toFixed(2)}</span>
                 </div>
-                
-                <div className="flex justify-between items-center text-slate-450 dark:text-slate-400 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <span>Discount sales</span>
+
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                  <div className="flex items-center gap-1">
+                    <span>Discount :</span>
                     <button
-                      type="button"
                       onClick={() => {
                         const amt = prompt(
-                          `Enter discount amount (as flat or percentage based on mode):`,
+                          `Enter Extra Discount amount (as flat or percentage based on mode):`,
                           currentOrder.overallDiscount.toString()
                         );
                         if (amt !== null) {
@@ -1614,95 +1616,85 @@ export default function POSPage() {
                           handleDiscountConfig(parseFloat(amt) || 0, typeVal);
                         }
                       }}
-                      className="text-slate-350 hover:text-[#5e50eb] dark:hover:text-[#7f74f7] transition-colors cursor-pointer"
-                      title="Adjust overall discount"
+                      className="hover:text-[#2563EB] transition-all cursor-pointer p-0.5"
+                      title="Edit Extra Discount"
                     >
-                      <Percent className="h-3 w-3" />
+                      <Edit2 className="h-3.5 w-3.5 text-slate-400" />
                     </button>
                   </div>
-                  <span className="text-red-500 font-extrabold">
-                    -{currencySymbol}{rawOverallDiscount.toFixed(2)}
+                  <span className="text-slate-800 dark:text-slate-100 font-bold">
+                    {currencySymbol}{(rawOverallDiscount + discountSales + couponDiscount).toFixed(2)}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center text-slate-450 dark:text-slate-400 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <span>Total sales tax</span>
-                    <span className="text-[9px] bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200/40 dark:border-slate-800/80">{vatPercentage}%</span>
-                  </div>
-                  <span className="text-slate-800 dark:text-slate-200 font-extrabold">{currencySymbol}{tax.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                  <span>Tax ({vatPercentage}%) :</span>
+                  <span className="text-slate-800 dark:text-slate-100 font-bold">{currencySymbol}{tax.toFixed(2)}</span>
                 </div>
 
-                {/* Subtle border divider */}
-                <div className="border-t border-slate-100 dark:border-slate-800 my-2 pt-2.5">
-                  <div className="flex justify-between items-center text-sm font-bold">
-                    <span className="text-slate-700 dark:text-slate-200 font-extrabold text-base">Total</span>
-                    <span className="text-[#5e50eb] dark:text-[#7f74f7] font-black text-2xl tracking-tight">
-                      {currencySymbol}{grandTotal.toFixed(2)}
-                    </span>
-                  </div>
+                <div className="flex justify-between items-center pt-2.5 border-t border-slate-150 dark:border-slate-800/80 my-1">
+                  <span className="text-slate-800 dark:text-slate-100 font-extrabold text-sm">Total :</span>
+                  <span className="text-[#10b981] dark:text-[#10b981] font-black text-xl tracking-tight">
+                    {currencySymbol}{grandTotal.toFixed(2)}
+                  </span>
                 </div>
-
-              {/* Cash input parameters have been moved to the checkout popup modal */}
               </div>
 
               {/* Submit Error alert box (if any) */}
               {submitError && (
-                <div className="bg-red-50 dark:bg-red-950/40 text-red-650 dark:text-red-400 text-[11px] font-bold p-3 rounded-2xl border border-red-200 dark:border-red-900/50 my-1 animate-in fade-in duration-200 flex justify-between items-start gap-2 text-left">
+                <div className="bg-red-50 dark:bg-red-950/40 text-red-655 dark:text-red-400 text-[11px] font-bold p-3 rounded-2xl border border-red-200 dark:border-red-900/50 my-1 animate-in fade-in duration-200 flex justify-between items-start gap-2 text-left">
                   <span>{submitError}</span>
                   <button
                     type="button"
                     onClick={() => setSubmitError("")}
-                    className="text-red-400 hover:text-red-650 font-black text-xs cursor-pointer shrink-0"
+                    className="text-red-405 hover:text-red-650 font-black text-xs cursor-pointer shrink-0"
                   >
-                    ×
+                    &times;
                   </button>
                 </div>
               )}
 
-              {/* Bottom Quick Billing controls action buttons grid */}
-              <div className="grid grid-cols-3 gap-2 text-[10px] font-bold pt-1">
-                <button
-                  type="button"
-                  onClick={() => setHoldModalOpen(true)}
-                  className="py-2.5 bg-[#0e1726] hover:bg-[#1b2e4b] text-white rounded-2xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95"
-                  title="Suspend Current Cart (F3)"
-                >
-                  <Pause className="h-3.5 w-3.5" /> Suspend
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setRecallModalOpen(true)}
-                  className="py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-650 dark:text-slate-300 rounded-2xl hover:bg-slate-55 dark:hover:bg-slate-850 cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95"
-                  title="Recall Draft Queue (F4)"
-                >
-                  <Play className="h-3.5 w-3.5" /> Recall
-                </button>
+              {/* Bottom checkout action buttons matching mockup */}
+              <div className="space-y-2 shrink-0 font-bold text-xs select-none">
+                {/* Row 1: Save & Print (F10) + Draft */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCheckoutSubmit}
+                    className="flex-1 py-3 bg-[#0f172a] dark:bg-slate-900 hover:bg-slate-800 dark:hover:bg-slate-800 text-white rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 text-center font-extrabold"
+                  >
+                    Save & Print (F10)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHoldModalOpen(true)}
+                    className="w-1/4 py-3 border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-55 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95"
+                    title="Suspend Current Cart (F3)"
+                  >
+                    <FileText className="h-4 w-4 text-slate-500" />
+                    <span>Draft</span>
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateCurrentOrder((o) => ({ ...o, cart: [] }));
-                    setIsAmountTenderedManuallySet(false);
-                    setAmountTendered(0);
-                  }}
-                  className="py-2.5 border border-red-200 text-red-500 bg-red-50/20 dark:bg-red-950/10 hover:bg-red-500/10 rounded-2xl cursor-pointer transition-all duration-150 active:scale-95 text-center"
-                  title="Clear Shopping Cart (Esc)"
-                >
-                  Clear Cart
-                </button>
+                {/* Row 2: Pay & Print (F9) + Pay (F8) */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCheckoutSubmit}
+                    className="flex-1 py-3 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 text-center font-extrabold"
+                  >
+                    Pay & Print (F9)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCheckout}
+                    className="flex-1 py-3 bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-150 active:scale-95 text-center font-extrabold"
+                    title="Open checkout payment details (F8 / Enter)"
+                  >
+                    Pay (F8)
+                  </button>
+                </div>
               </div>
-
-              {/* Complete checkout button */}
-              <button
-                type="button"
-                onClick={openCheckout}
-                className="w-full py-4 bg-[#5e50eb] hover:bg-[#4d3fd4] text-white rounded-[22px] text-sm font-black shadow-md hover:shadow-lg transition-all duration-150 transform hover:scale-[1.005] active:scale-98 flex items-center justify-center gap-2 cursor-pointer text-center"
-                title="Open checkout payment details (F6 / Enter)"
-              >
-                Pay Now
-              </button>
             </div>
           )}
         </div>
@@ -1735,7 +1727,7 @@ export default function POSPage() {
               <button
                 onClick={handleHoldBill}
                 disabled={!holdName.trim()}
-                className="px-4 py-2 bg-[#5e50eb] text-white text-xs font-bold rounded-lg hover:bg-[#4d3fd4] disabled:opacity-50"
+                className="px-4 py-2 bg-[#2563EB] text-white text-xs font-bold rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50"
               >
                 Hold Cart
               </button>
@@ -1775,7 +1767,7 @@ export default function POSPage() {
                         {new Date(b.createdAt).toLocaleTimeString()} ({b.items.length} items)
                       </span>
                     </div>
-                    <span className="text-xs font-black text-[#5e50eb]">
+                    <span className="text-xs font-black text-[#2563EB]">
                       ${b.items.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2)}
                     </span>
                   </div>
@@ -1880,7 +1872,7 @@ export default function POSPage() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-[#5e50eb] text-white text-xs font-bold rounded-lg hover:bg-[#4d3fd4] shadow-md shadow-[#5e50eb]/20"
+                className="px-5 py-2 bg-[#2563EB] text-white text-xs font-bold rounded-lg hover:bg-[#1D4ED8] shadow-md shadow-[#2563EB]/20"
               >
                 Register Customer
               </button>
@@ -1894,7 +1886,7 @@ export default function POSPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 no-print animate-in fade-in duration-100">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4">
             <div>
-              <span className="text-[9px] bg-primary/20 text-[#5e50eb] border border-primary/30 font-bold px-2 py-0.5 rounded-full uppercase">
+              <span className="text-[9px] bg-primary/20 text-[#2563EB] border border-primary/30 font-bold px-2 py-0.5 rounded-full uppercase">
                 Weight Scale Input
               </span>
               <h3 className="text-sm font-black mt-2 text-slate-800 dark:text-slate-100">
@@ -1917,7 +1909,7 @@ export default function POSPage() {
                     placeholder="0.000"
                     value={weightInputValue}
                     onChange={(e) => setWeightInputValue(e.target.value)}
-                    className="w-full pl-3 pr-10 py-2.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-[#5e50eb] text-center"
+                    className="w-full pl-3 pr-10 py-2.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-[#2563EB] text-center"
                     autoFocus
                   />
                   <span className="absolute right-3 top-3.5 text-xs text-slate-400 font-bold">
@@ -1964,7 +1956,7 @@ export default function POSPage() {
                 type="button"
                 onClick={() => handleWeightSubmit(Number(weightInputValue))}
                 disabled={!weightInputValue || isNaN(Number(weightInputValue)) || Number(weightInputValue) <= 0}
-                className="px-5 py-2 bg-[#5e50eb] text-white text-xs font-bold rounded-lg hover:bg-[#4d3fd4] shadow-lg disabled:opacity-50"
+                className="px-5 py-2 bg-[#2563EB] text-white text-xs font-bold rounded-lg hover:bg-[#1D4ED8] shadow-lg disabled:opacity-50"
               >
                 Add Weight
               </button>
@@ -1988,7 +1980,7 @@ export default function POSPage() {
             </button>
 
             <div className="space-y-1">
-              <span className="text-[9px] bg-[#5e50eb]/10 text-[#5e50eb] border border-[#5e50eb]/20 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
+              <span className="text-[9px] bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
                 Alternative Helpers
               </span>
               <h3 className="text-base font-black text-slate-800 dark:text-slate-100 mt-1">
@@ -2019,7 +2011,7 @@ export default function POSPage() {
                       className="flex justify-between items-center p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors text-xs"
                     >
                       <span className="font-semibold text-slate-700 dark:text-slate-350">{alt.name}</span>
-                      <span className="font-bold text-[#5e50eb]">{currencySymbol}{alt.sellingPrice.toFixed(2)}</span>
+                      <span className="font-bold text-[#2563EB]">{currencySymbol}{alt.sellingPrice.toFixed(2)}</span>
                     </div>
                   ))}
                 {products.filter((p) => p.categoryId === detailsProduct.categoryId && p.id !== detailsProduct.id).length === 0 && (
@@ -2171,7 +2163,7 @@ export default function POSPage() {
             {/* Total Payable Banner */}
             <div className="bg-[#F3F4F6] dark:bg-slate-950 border border-slate-200/50 dark:border-slate-800 rounded-2xl p-4 flex justify-between items-center select-none">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Payable</span>
-              <span className="text-[#5e50eb] dark:text-[#7f74f7] font-black text-2xl">
+              <span className="text-[#2563EB] dark:text-[#7f74f7] font-black text-2xl">
                 {currencySymbol}{grandTotal.toFixed(2)}
               </span>
             </div>
@@ -2204,7 +2196,7 @@ export default function POSPage() {
                     }}
                     className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center ${
                       splitType === opt.value
-                        ? "bg-[#5e50eb] text-white shadow-sm"
+                        ? "bg-[#2563EB] text-white shadow-sm"
                         : "text-slate-500 hover:text-slate-800 dark:text-slate-405"
                     }`}
                   >
@@ -2230,7 +2222,7 @@ export default function POSPage() {
                         onClick={() => setSinglePaymentMethod(method)}
                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center ${
                           singlePaymentMethod === method
-                            ? "bg-[#5e50eb] text-white shadow-sm"
+                            ? "bg-[#2563EB] text-white shadow-sm"
                             : "text-slate-500 hover:text-slate-800 dark:text-slate-405"
                         }`}
                       >
@@ -2254,7 +2246,7 @@ export default function POSPage() {
                             setAmountTendered(Math.max(0, parseFloat(e.target.value) || 0));
                             setIsAmountTenderedManuallySet(true);
                           }}
-                          className="w-28 pl-6 pr-2 py-1 border border-slate-200 dark:border-slate-800 rounded-lg text-right text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-white font-extrabold focus:outline-none focus:ring-1 focus:ring-[#5e50eb]"
+                          className="w-28 pl-6 pr-2 py-1 border border-slate-200 dark:border-slate-800 rounded-lg text-right text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-white font-extrabold focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
                         />
                       </div>
                     </div>
@@ -2302,7 +2294,7 @@ export default function POSPage() {
                     
                     <div className="space-y-1.5 px-2">
                       <p className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-1.5">
-                        Scan to Pay: <span className="text-[#5e50eb] dark:text-[#7f74f7] text-sm font-black">{currencySymbol}{grandTotal.toFixed(2)}</span>
+                        Scan to Pay: <span className="text-[#2563EB] dark:text-[#7f74f7] text-sm font-black">{currencySymbol}{grandTotal.toFixed(2)}</span>
                       </p>
                       <p className="text-[10px] text-slate-450 dark:text-slate-400 leading-relaxed max-w-[240px]">
                         Scan the dynamic QR code using any digital wallet, Fonepay, or UPI mobile banking app to complete transaction.
@@ -2338,7 +2330,7 @@ export default function POSPage() {
                           },
                         }))
                       }
-                      className="px-1 py-1 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-xs font-bold focus:ring-1 focus:ring-[#5e50eb] outline-none text-foreground"
+                      className="px-1 py-1 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-xs font-bold focus:ring-1 focus:ring-[#2563EB] outline-none text-foreground"
                     />
                   ))}
                 </div>
@@ -2394,7 +2386,7 @@ export default function POSPage() {
                             return next;
                           });
                         }}
-                        className="p-0.5 text-[#5e50eb] hover:text-[#4d3fd4] cursor-pointer"
+                        className="p-0.5 text-[#2563EB] hover:text-[#1D4ED8] cursor-pointer"
                       >
                         <Plus className="h-2.5 w-2.5 stroke-[3px]" />
                       </button>
@@ -2412,7 +2404,7 @@ export default function POSPage() {
                       }
                       setPersonsPayments(newPayments);
                     }}
-                    className="px-2 py-1 bg-[#5e50eb]/10 hover:bg-[#5e50eb]/15 text-[#5e50eb] text-[9px] font-black rounded-lg cursor-pointer"
+                    className="px-2 py-1 bg-[#2563EB]/10 hover:bg-[#2563EB]/15 text-[#2563EB] text-[9px] font-black rounded-lg cursor-pointer"
                   >
                     Auto-Split Evenly
                   </button>
@@ -2439,7 +2431,7 @@ export default function POSPage() {
                               return next;
                             });
                           }}
-                          className="w-full pl-5 pr-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#5e50eb] outline-none text-foreground"
+                          className="w-full pl-5 pr-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#2563EB] outline-none text-foreground"
                         />
                       </div>
                     </div>
@@ -2475,7 +2467,7 @@ export default function POSPage() {
                 type="button"
                 onClick={handleCheckoutSubmit}
                 disabled={splitType === "METHOD" && remainingOrChange < 0}
-                className="px-5 py-2 bg-[#5e50eb] hover:bg-[#4d3fd4] disabled:opacity-40 text-white text-xs font-bold rounded-lg shadow-md cursor-pointer animate-in duration-150"
+                className="px-5 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 text-white text-xs font-bold rounded-lg shadow-md cursor-pointer animate-in duration-150"
               >
                 Complete Checkout
               </button>

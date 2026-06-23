@@ -29,6 +29,7 @@ interface DashboardMetrics {
   totalSales: number;
   totalPurchases: number;
   totalExpenses: number;
+  totalIncome: number;
   grossProfit: number;
   netProfit: number;
   costOfGoodsSold: number;
@@ -132,7 +133,7 @@ export default function DashboardPage() {
 
       {/* 1. Metrics Grid */}
       {metrics && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Card 1: Total Sales */}
           <div className="glass-card p-6 rounded-3xl flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -159,7 +160,20 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 3: Monthly Expenses */}
+          {/* Card 3: Other Income */}
+          <div className="glass-card p-6 rounded-3xl flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Other Income</p>
+              <h3 className="text-xl font-black mt-0.5">{currencySymbol}{metrics.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+              <p className="text-[9px] text-muted-foreground mt-0.5">Additional monthly inflow</p>
+            </div>
+          </div>
+
+          {/* Card 4: Monthly Expenses */}
           <div className="glass-card p-6 rounded-3xl flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="h-12 w-12 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center flex-shrink-0">
@@ -172,7 +186,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 4: Net Profit */}
+          {/* Card 5: Net Profit */}
           <div className="glass-card p-6 rounded-3xl flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
             <div className={`absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity ${netProfitPositive ? "from-emerald-500/5" : "from-red-500/5"} to-transparent`} />
             <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -185,7 +199,7 @@ export default function DashboardPage() {
               <h3 className={`text-xl font-black mt-0.5 ${netProfitPositive ? "text-primary" : "text-destructive"}`}>
                 {currencySymbol}{metrics.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h3>
-              <p className="text-[9px] text-muted-foreground mt-0.5">Sales - COGS - Expenses</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5">Sales - COGS + Income - Expenses</p>
             </div>
           </div>
         </div>

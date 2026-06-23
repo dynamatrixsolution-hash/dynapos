@@ -9,7 +9,7 @@ interface SaleItem {
   invoiceNumber: string;
   total: number;
   paidAmount: number;
-  paymentMethod: string;
+  payments: Array<{ method: string }>;
   paymentStatus: string;
   status: string;
   notes: string | null;
@@ -108,7 +108,9 @@ export default function SalesPage() {
                     </td>
                     <td className="py-3 px-2 text-center">
                       <span className="bg-secondary px-2 py-0.5 rounded font-bold text-[9px]">
-                        {sale.paymentMethod}
+                        {sale.payments && sale.payments.length > 0
+                          ? Array.from(new Set(sale.payments.map((p: any) => p.method))).join(", ")
+                          : "CREDIT"}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-center">

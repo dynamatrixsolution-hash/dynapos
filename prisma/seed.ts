@@ -438,7 +438,262 @@ async function main() {
   });
 
   console.log("Customer & Supplier seeding completed.");
-  console.log("Seeding completed successfully!");
+
+  // 12. Create Expense Categories & Expenses
+  console.log("Seeding historical expenses and incomes...");
+  const rentCategory = await prisma.expenseCategory.create({
+    data: { businessId: business.id, name: "Rent & Utilities" },
+  });
+
+  const salaryCategory = await prisma.expenseCategory.create({
+    data: { businessId: business.id, name: "Salaries" },
+  });
+
+  const rentExpense = await prisma.expense.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      categoryId: rentCategory.id,
+      userId: owner.id,
+      amount: 1200.0,
+      reference: "VOUCH-RENT-001",
+      description: "Main branch shop monthly rent payment",
+    },
+  });
+
+  const salaryExpense = await prisma.expense.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      categoryId: salaryCategory.id,
+      userId: owner.id,
+      amount: 2500.0,
+      reference: "VOUCH-SAL-001",
+      description: "Staff monthly salary payout",
+    },
+  });
+
+  // 13. Create Income Categories & Incomes
+  const recycleCategory = await prisma.incomeCategory.create({
+    data: { businessId: business.id, name: "Recycling / Scrap Sales" },
+  });
+
+  const scrapIncome = await prisma.income.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      categoryId: recycleCategory.id,
+      userId: owner.id,
+      amount: 150.0,
+      reference: "INC-REC-001",
+      description: "Sale of cardboard packing boxes",
+    },
+  });
+
+  // 14. Create Historical Sales & SaleItems
+  console.log("Seeding historical transactions (sales & purchases)...");
+  
+  // Sale 1: Walk-in customer cash sale
+  const sale1 = await prisma.sale.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      customerId: walkInCustomer.id,
+      userId: cashier.id,
+      invoiceNumber: "INV-2026-1001",
+      status: "COMPLETED",
+      subtotal: 48.78,
+      discount: 2.0,
+      tax: 4.68,
+      total: 51.46,
+      paidAmount: 51.46,
+      paymentStatus: "PAID",
+    },
+  });
+
+  await prisma.saleItem.createMany({
+    data: [
+      {
+        saleId: sale1.id,
+        productId: bananasProduct.id,
+        quantity: 5,
+        price: bananasProduct.sellingPrice,
+        total: 5 * bananasProduct.sellingPrice,
+      },
+      {
+        saleId: sale1.id,
+        productId: milkProduct.id,
+        quantity: 10,
+        price: milkProduct.sellingPrice,
+        total: 10 * milkProduct.sellingPrice,
+      },
+    ],
+  });
+
+  // Sale 2: Regular customer card sale
+  const sale2 = await prisma.sale.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      customerId: regularCustomer.id,
+      userId: cashier.id,
+      invoiceNumber: "INV-2026-1002",
+      status: "COMPLETED",
+      subtotal: 82.90,
+      discount: 0.0,
+      tax: 8.29,
+      total: 91.19,
+      paidAmount: 91.19,
+      paymentStatus: "PAID",
+    },
+  });
+
+  await prisma.saleItem.createMany({
+    data: [
+      {
+        saleId: sale2.id,
+        productId: detergentProduct.id,
+        quantity: 5,
+        price: detergentProduct.sellingPrice,
+        total: 5 * detergentProduct.sellingPrice,
+      },
+      {
+        saleId: sale2.id,
+        productId: cokeProduct.id,
+        quantity: 3,
+        price: cokeProduct.sellingPrice,
+        total: 3 * cokeProduct.sellingPrice,
+      },
+    ],
+  });
+
+  // 15. Create Historical Purchases & PurchaseItems
+  // Purchase 1: Stock intake from Global Supplier
+  const purchase1 = await prisma.purchase.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      supplierId: demoSupplier.id,
+      userId: owner.id,
+      purchaseNumber: "PUR-2026-1001",
+      status: "RECEIVED",
+      subtotal: 155.0,
+      discount: 0.0,
+      tax: 15.5,
+      total: 170.5,
+      paidAmount: 170.5,
+      paymentStatus: "PAID",
+    },
+  });
+
+  await prisma.purchaseItem.createMany({
+    data: [
+      {
+        purchaseId: purchase1.id,
+        productId: milkProduct.id,
+        quantity: 50,
+        price: milkProduct.costPrice,
+        total: 50 * milkProduct.costPrice,
+      },
+      {
+        purchaseId: purchase1.id,
+        productId: tomatoesProduct.id,
+        quantity: 41,
+        price: tomatoesProduct.costPrice,
+        total: 41 * tomatoesProduct.costPrice,
+      },
+    ],
+  });
+
+  // 16. Seed Cash Flow / Payment Records
+  console.log("Seeding core cashflow registers...");
+  
+  // Sale payments (RECEIVED)
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      saleId: sale1.id,
+      userId: cashier.id,
+      amount: 51.46,
+      method: "CASH",
+      type: "RECEIVED",
+      receiptNumber: "REC-2026-1001",
+      remarks: "Cash sale register settlement",
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      saleId: sale2.id,
+      userId: cashier.id,
+      amount: 91.19,
+      method: "CARD",
+      type: "RECEIVED",
+      receiptNumber: "REC-2026-1002",
+      remarks: "Card payment swipe order",
+    },
+  });
+
+  // Purchase payment (SENT)
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      purchaseId: purchase1.id,
+      userId: owner.id,
+      amount: 170.5,
+      method: "BANK_TRANSFER",
+      type: "SENT",
+      receiptNumber: "VOUCH-PUR-1001",
+      remarks: "Bank wire payment to Global Distributor",
+    },
+  });
+
+  // Direct standalone income collections (RECEIVED)
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      userId: owner.id,
+      amount: 150.0,
+      method: "CASH",
+      type: "RECEIVED",
+      receiptNumber: "REC-INC-1001",
+      remarks: "Recycling / Scrap Sales: cardboard box disposal",
+    },
+  });
+
+  // Direct standalone expense payments (SENT)
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      userId: owner.id,
+      amount: 1200.0,
+      method: "BANK_TRANSFER",
+      type: "SENT",
+      receiptNumber: "REC-EXP-1001",
+      remarks: "Rent & Utilities: Main shop monthly rent",
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      businessId: business.id,
+      branchId: mainBranch.id,
+      userId: owner.id,
+      amount: 2500.0,
+      method: "BANK_TRANSFER",
+      type: "SENT",
+      receiptNumber: "REC-EXP-1002",
+      remarks: "Salaries: Staff payroll payout",
+    },
+  });
+
+  console.log("Historical data seeding completed successfully!");
 }
 
 main()

@@ -38,11 +38,66 @@ function LoginForm() {
     }
   }, [errorParam]);
 
+  const getDeviceId = () => {
+    if (typeof window === "undefined") return "";
+    let deviceId = localStorage.getItem("dyna_device_id");
+    if (!deviceId) {
+      deviceId = typeof crypto.randomUUID === "function" 
+        ? crypto.randomUUID() 
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem("dyna_device_id", deviceId);
+    }
+    return deviceId;
+  };
+
+  const getDeviceName = () => {
+    if (typeof window === "undefined") return "Web POS Terminal";
+    const ua = navigator.userAgent;
+    let browser = "Browser";
+    if (ua.indexOf("Firefox") > -1) browser = "Firefox";
+    else if (ua.indexOf("Chrome") > -1) browser = "Chrome";
+    else if (ua.indexOf("Safari") > -1) browser = "Safari";
+    else if (ua.indexOf("Edge") > -1) browser = "Edge";
+    
+    let os = "OS";
+    if (ua.indexOf("Windows") > -1) os = "Windows";
+    else if (ua.indexOf("Mac") > -1) os = "Mac";
+    else if (ua.indexOf("Linux") > -1) os = "Linux";
+    else if (ua.indexOf("Android") > -1) os = "Android";
+    else if (ua.indexOf("iPhone") > -1) os = "iOS";
+    
+    return `${browser} on ${os}`;
+  };
+
   const onSubmit = async (data: LoginInputs) => {
     setIsLoading(true);
     setAuthError(null);
 
     try {
+      const deviceId = getDeviceId();
+      const deviceName = getDeviceName();
+
+      // 1. Check device lock authorization
+      const checkRes = await fetch("/api/v1/auth/device-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: data.email,
+          deviceId,
+          deviceName,
+        }),
+      });
+
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (checkData.success === false) {
+          setAuthError(checkData.message || "Unauthorized device. This account is locked to a different terminal/device. Please contact your system administrator.");
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // 2. Perform credentials verification
       const res = await signIn("credentials", {
         email: data.email,
         password: data.password,

@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Store,
   AlertTriangle,
+  Clock,
 } from "lucide-react";
 
 interface UserMeta {
@@ -43,16 +44,86 @@ interface NotificationMeta {
   createdAt: Date;
 }
 
+interface SubscriptionMeta {
+  plan: string;
+  endDate: Date | string;
+  status: string;
+}
+
+function SubscriptionTimer({
+  endDate,
+  plan,
+  status,
+}: SubscriptionMeta) {
+  const [timeLeft, setTimeLeft] = React.useState("");
+  const [urgency, setUrgency] = React.useState<"normal" | "warning" | "danger">("normal");
+
+  React.useEffect(() => {
+    function updateTimer() {
+      const end = new Date(endDate);
+      const now = new Date();
+      const diff = end.getTime() - now.getTime();
+
+      if (diff <= 0 || status !== "ACTIVE") {
+        setTimeLeft("Expired");
+        setUrgency("danger");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (days > 30) {
+        setTimeLeft(`${days}d left`);
+        setUrgency("normal");
+      } else if (days > 7) {
+        setTimeLeft(`${days}d left`);
+        setUrgency("warning");
+      } else if (days >= 1) {
+        setTimeLeft(`${days}d ${hours}h left`);
+        setUrgency("danger");
+      } else {
+        setTimeLeft(`${hours}h ${minutes}m left`);
+        setUrgency("danger");
+      }
+    }
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [endDate, status]);
+
+  const colorClasses = {
+    normal: "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400 dark:bg-blue-500/5",
+    warning: "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 dark:bg-amber-500/5 animate-pulse",
+    danger: "bg-red-500/10 border-red-500/20 text-red-655 dark:text-red-400 dark:bg-red-500/5 font-extrabold animate-pulse",
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-bold ${colorClasses[urgency]} transition-all duration-300 shadow-xs`}
+      title={`Plan: ${plan} (Ends: ${new Date(endDate).toLocaleDateString()})`}
+    >
+      <Clock className="h-3 w-3" />
+      <span className="hidden xs:inline uppercase tracking-wider text-[8px] opacity-75">{plan}:</span>
+      <span>{timeLeft}</span>
+    </div>
+  );
+}
+
 export default function DashboardShellClient({
   children,
   user,
   branches,
   initialNotifications,
+  subscription,
 }: {
   children: React.ReactNode;
   user: UserMeta;
   branches: BranchMeta[];
   initialNotifications: any[];
+  subscription?: SubscriptionMeta | null;
 }) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -119,24 +190,24 @@ export default function DashboardShellClient({
       if (allowedChildren.length === 0) return null;
 
       return (
-        <div key={item.title} className="mb-1">
+        <div key={item.title} className="mb-1.5">
           <button
             onClick={() => toggleMenu(item.title)}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group cursor-pointer ${
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 group cursor-pointer ${
               hasActiveChild
-                ? "bg-slate-100 dark:bg-slate-850 text-slate-800 dark:text-white font-bold" 
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850 hover:text-slate-800 dark:hover:text-white"
+                ? "bg-[#1E3A5F] text-white" 
+                : "text-slate-300 hover:bg-[#1E3A5F] hover:text-white"
             }`}
           >
             <div className="flex items-center gap-3">
-              <Icon className={`h-5 w-5 ${hasActiveChild ? "text-[#5e50eb] dark:text-blue-500" : "text-slate-400 dark:text-slate-500 group-hover:text-[#5e50eb] dark:group-hover:text-blue-450"}`} />
+              <Icon className={`h-4.5 w-4.5 ${hasActiveChild ? "text-[#38BDF8]" : "text-slate-400 group-hover:text-white"}`} />
               {item.title}
             </div>
             <motion.div
               animate={{ rotate: isExpanded ? 90 : 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
             </motion.div>
           </button>
           
@@ -149,7 +220,7 @@ export default function DashboardShellClient({
                 transition={{ duration: 0.3, ease: "easeInOut" }}
                 className="overflow-hidden"
               >
-                <div className="pl-9 pr-3 py-1 space-y-1 border-l border-slate-150 dark:border-slate-800 ml-5 mt-1">
+                <div className="pl-6 pr-2 py-1.5 space-y-1 border-l border-slate-800 ml-5 mt-1">
                   {allowedChildren.map((child) => {
                     const isChildActive = pathname === child.href;
                     const ChildIcon = child.icon;
@@ -158,13 +229,13 @@ export default function DashboardShellClient({
                         key={child.title}
                         href={child.href!}
                         onClick={() => isMobile && setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 ${
                           isChildActive
-                            ? "bg-[#5e50eb]/10 text-[#5e50eb] font-bold"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800"
+                            ? "bg-[#2563EB] text-white"
+                            : "text-slate-400 hover:text-white hover:bg-[#1E3A5F]"
                         }`}
                       >
-                        <ChildIcon className="h-4 w-4" />
+                        <ChildIcon className="h-3.5 w-3.5" />
                         {child.title}
                       </Link>
                     );
@@ -183,14 +254,14 @@ export default function DashboardShellClient({
         key={item.title}
         href={item.href!}
         onClick={() => isMobile && setMobileMenuOpen(false)}
-        className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group mb-1 ${
+        className={`flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 group mb-1.5 ${
           isActive
-            ? "bg-gradient-to-r from-[#5e50eb] to-indigo-650 text-white shadow-md shadow-[#5e50eb]/20"
-            : "text-slate-550 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-855 hover:text-slate-800 dark:hover:text-white"
+            ? "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md shadow-[#2563EB]/15"
+            : "text-slate-300 hover:bg-[#1E3A5F] hover:text-white"
         }`}
       >
         <div className="flex items-center gap-3">
-          <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-400 dark:text-slate-550 group-hover:text-[#5e50eb] dark:group-hover:text-blue-450"}`} />
+          <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-white"}`} />
           {item.title}
         </div>
       </Link>
@@ -199,25 +270,23 @@ export default function DashboardShellClient({
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      {/* 1. Sidebar desktop (Theme Adaptive) */}
-      <aside className={`hidden md:flex md:flex-col flex-shrink-0 transition-all duration-300 bg-white dark:bg-[#050B1E] border-r border-slate-100 dark:border-slate-850/50 ${isPosRoute && !posSidebarOpen ? "w-0 overflow-hidden" : "w-64"}`}>
-        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-[#050B1E]">
+      {/* 1. Sidebar desktop (Fixed dark theme) */}
+      <aside className={`hidden md:flex md:flex-col flex-shrink-0 transition-all duration-300 bg-[#111827] border-r border-slate-800 ${isPosRoute && !posSidebarOpen ? "w-0 overflow-hidden" : "w-64"}`}>
+        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-[#111827]">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#5e50eb] text-white shadow-md shadow-[#5e50eb]/25">
-              <Calculator className="h-5 w-5" />
-            </div>
-            <span className="text-xl font-extrabold text-slate-800 dark:text-white tracking-tight">
-              DynaPOS
+            <img src="/logo.jpg" alt="DynaOne Logo" className="h-8 w-8 rounded-lg object-contain shrink-0" />
+            <span className="text-xl font-extrabold text-white tracking-tight">
+              DynaOne
             </span>
           </Link>
         </div>
         <nav className="flex-1 overflow-y-auto px-4 py-6">
           {allowedNavigation.map((item) => renderNavItem(item))}
         </nav>
-        <div className="p-4 border-t border-slate-105 dark:border-white/5 bg-white dark:bg-[#050B1E]">
+        <div className="p-4 border-t border-slate-800 bg-[#111827]">
           <button
             onClick={() => signOut({ callbackUrl: "/auth/login" })}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 font-bold transition-colors cursor-pointer"
           >
             <LogOut className="h-5 w-5" />
             Logout
@@ -228,15 +297,15 @@ export default function DashboardShellClient({
       {/* 2. Main content container */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Top Navbar */}
-        <header className={`flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-30 transition-all duration-300 bg-white dark:bg-[#050B1E] border-b border-slate-100 dark:border-slate-850 ${isPosRoute && !posNavbarOpen ? "h-0 opacity-0 overflow-hidden py-0 border-b-0" : "h-16"}`}>
+        <header className={`flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-30 transition-all duration-300 bg-white border-b border-[#E5E7EB] ${isPosRoute && !posNavbarOpen ? "h-0 opacity-0 overflow-hidden py-0 border-b-0" : "h-16"}`}>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-900"
+              className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-slate-100"
             >
               <Menu className="h-6 w-6" />
             </button>
-            <div className="md:hidden font-bold text-xl text-[#5e50eb]">DynaPOS</div>
+            <div className="md:hidden font-bold text-xl text-[#2563EB]">DynaOne</div>
             
             {activeBranch && (
               <div className="relative">
@@ -247,7 +316,7 @@ export default function DashboardShellClient({
                       onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
                       className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold cursor-pointer shadow-xs select-none hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
                     >
-                      <div className="flex items-center justify-center p-1 bg-[#5e50eb]/10 dark:bg-[#5e50eb]/20 rounded-lg text-[#5e50eb] dark:text-purple-400 shrink-0">
+                      <div className="flex items-center justify-center p-1 bg-[#2563EB]/10 dark:bg-[#2563EB]/20 rounded-lg text-[#2563EB] dark:text-purple-400 shrink-0">
                         <Store className="h-3.5 w-3.5" />
                       </div>
                       <span className="max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
@@ -266,7 +335,7 @@ export default function DashboardShellClient({
                               onClick={() => handleBranchSwitch(branch)}
                               className={`flex items-center justify-between w-full text-left px-3 py-2.5 text-xs rounded-xl transition-colors cursor-pointer ${
                                 activeBranch.id === branch.id
-                                  ? "bg-[#5e50eb]/10 text-[#5e50eb] font-bold"
+                                  ? "bg-[#2563EB]/10 text-[#2563EB] font-bold"
                                   : "hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300"
                               }`}
                             >
@@ -281,7 +350,7 @@ export default function DashboardShellClient({
                 ) : (
                   /* Non-owners see only their assigned warehouse as read-only */
                   <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold cursor-default select-none">
-                    <div className="flex items-center justify-center p-1 bg-[#5e50eb]/10 dark:bg-[#5e50eb]/20 rounded-lg text-[#5e50eb] dark:text-purple-400 shrink-0">
+                    <div className="flex items-center justify-center p-1 bg-[#2563EB]/10 dark:bg-[#2563EB]/20 rounded-lg text-[#2563EB] dark:text-purple-400 shrink-0">
                       <Store className="h-3.5 w-3.5" />
                     </div>
                     <span className="max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
@@ -292,12 +361,14 @@ export default function DashboardShellClient({
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
+            {subscription && (
+              <SubscriptionTimer
+                endDate={subscription.endDate}
+                plan={subscription.plan}
+                status={subscription.status}
+              />
+            )}
+            {/* Theme switcher removed */}
 
             <div className="relative">
               <button
@@ -316,7 +387,7 @@ export default function DashboardShellClient({
                     <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Alerts & Logs</span>
                       {notifications.length > 0 && (
-                        <button onClick={handleMarkAllNotificationsRead} className="text-[10px] text-[#5e50eb] hover:underline font-semibold cursor-pointer">
+                        <button onClick={handleMarkAllNotificationsRead} className="text-[10px] text-[#2563EB] hover:underline font-semibold cursor-pointer">
                           Clear all
                         </button>
                       )}
@@ -346,7 +417,7 @@ export default function DashboardShellClient({
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 className="flex items-center gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-900/60 p-1 rounded-xl transition-colors cursor-pointer"
               >
-                <div className="h-8 w-8 rounded-full bg-[#5e50eb]/10 text-[#5e50eb] dark:bg-[#5e50eb]/25 dark:text-purple-400 flex items-center justify-center font-extrabold text-xs select-none">
+                <div className="h-8 w-8 rounded-full bg-[#2563EB]/10 text-[#2563EB] dark:bg-[#2563EB]/25 dark:text-purple-400 flex items-center justify-center font-extrabold text-xs select-none">
                   {user.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="hidden lg:block text-left">
@@ -379,7 +450,7 @@ export default function DashboardShellClient({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 z-10 relative">
+        <main className={`flex-1 overflow-y-auto bg-background z-10 relative ${isPosRoute ? "p-0" : "p-4 md:p-6"}`}>
           {children}
         </main>
       </div>
@@ -401,12 +472,15 @@ export default function DashboardShellClient({
               exit={{ x: "-100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
               className="fixed inset-y-0 left-0 w-72 z-50 flex flex-col md:hidden"
-              style={{ backgroundColor: "#050B1E" }}
+              style={{ backgroundColor: "#111827" }}
             >
-              <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  DynaPOS
-                </span>
+              <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+                <Link href="/dashboard" className="flex items-center gap-3">
+                  <img src="/logo.jpg" alt="DynaOne Logo" className="h-8 w-8 rounded-lg object-contain shrink-0" />
+                  <span className="text-xl font-extrabold text-white tracking-tight">
+                    DynaOne
+                  </span>
+                </Link>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="p-1 rounded-md text-slate-400 hover:bg-white/10 hover:text-white"
@@ -417,10 +491,10 @@ export default function DashboardShellClient({
               <nav className="flex-1 overflow-y-auto px-4 py-6">
                 {allowedNavigation.map((item) => renderNavItem(item, true))}
               </nav>
-              <div className="p-4 border-t border-white/5">
+              <div className="p-4 border-t border-slate-800">
                 <button
                   onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-red-400 hover:bg-red-500/10 font-medium transition-colors"
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 font-bold transition-colors cursor-pointer"
                 >
                   <LogOut className="h-5 w-5" />
                   Logout

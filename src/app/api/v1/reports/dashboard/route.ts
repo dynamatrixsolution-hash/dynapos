@@ -63,7 +63,21 @@ export async function GET(request: Request) {
 
     const totalExpenses = expensesAggregate._sum.amount || 0;
 
-    // 4. Calculate Net Profit: Sales Revenue - Cost of Goods Sold (COGS) - Expenses
+    // 3b. Total Income (current month)
+    const incomeAggregate = await db.income.aggregate({
+      where: {
+        businessId: context.businessId,
+        branchId,
+        createdAt: { gte: startOfMonth, lte: endOfDay },
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const totalIncome = incomeAggregate._sum.amount || 0;
+
+    // 4. Calculate Net Profit: Sales Revenue - Cost of Goods Sold (COGS) - Expenses + Income
     // Fetch all completed sales items for this month to calculate COGS
     const saleItems = await db.saleItem.findMany({
       where: {
@@ -83,7 +97,7 @@ export async function GET(request: Request) {
 
     const costOfGoodsSold = saleItems.reduce((sum, item) => sum + item.quantity * item.costPrice, 0);
     const grossProfit = totalSales - costOfGoodsSold;
-    const netProfit = grossProfit - totalExpenses;
+    const netProfit = grossProfit + totalIncome - totalExpenses;
 
     // 5. Low Stock alerts (active branch)
     // Products where stock level is below or equal to alertQuantity
@@ -211,6 +225,7 @@ export async function GET(request: Request) {
         totalSales,
         totalPurchases,
         totalExpenses,
+        totalIncome,
         grossProfit,
         netProfit,
         costOfGoodsSold,

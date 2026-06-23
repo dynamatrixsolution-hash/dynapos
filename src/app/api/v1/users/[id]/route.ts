@@ -5,6 +5,8 @@ import { z } from "zod";
 
 const updateUserSchema = z.object({
   branchId: z.string().uuid().optional().nullable(),
+  allowedDeviceId: z.string().optional().nullable(),
+  deviceName: z.string().optional().nullable(),
 });
 
 export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -30,7 +32,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
       );
     }
 
-    const { branchId } = result.data;
+    const { branchId, allowedDeviceId, deviceName } = result.data;
 
     // Verify user belongs to business
     const existing = await db.user.findFirst({
@@ -45,11 +47,24 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const updateData: any = {};
+    if (branchId !== undefined) updateData.branchId = branchId;
+    if (allowedDeviceId !== undefined) updateData.allowedDeviceId = allowedDeviceId;
+    if (deviceName !== undefined) updateData.deviceName = deviceName;
+
     // Update user
     const updatedUser = await db.user.update({
       where: { id: params.id },
-      data: { branchId },
+      data: updateData,
     });
+
+    let auditDetails = `Updated properties for user ${updatedUser.name}.`;
+    if (branchId !== undefined) {
+      auditDetails = `Updated branch access for user ${updatedUser.name} to ${branchId || "All Branches"}.`;
+    }
+    if (allowedDeviceId === null) {
+      auditDetails = `Released authorized POS device lock for user ${updatedUser.name}.`;
+    }
 
     // Write audit log
     await db.auditLog.create({
@@ -58,7 +73,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
         userId: context.userId,
         action: "UPDATE",
         module: "USER",
-        details: `Updated branch access for user ${updatedUser.name} to ${branchId || "All Branches"}.`,
+        details: auditDetails,
       },
     });
 

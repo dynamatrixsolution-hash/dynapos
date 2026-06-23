@@ -14,33 +14,20 @@ const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = React.useState<Theme>("light");
   const [mounted, setMounted] = React.useState(false);
-
   React.useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme | null;
-    const activeTheme = savedTheme || "system";
-    setThemeState(activeTheme);
-
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const resolved = activeTheme === "system" ? systemTheme : activeTheme;
-
+    setThemeState("light");
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
-    root.classList.add(resolved);
+    root.classList.add("light");
     setMounted(true);
   }, []);
 
   const setTheme = (newTheme: Theme) => {
-    localStorage.setItem("theme", newTheme);
-    setThemeState(newTheme);
-
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const resolved = newTheme === "system" ? systemTheme : newTheme;
-
+    setThemeState("light");
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
-    root.classList.add(resolved);
+    root.classList.add("light");
   };
-
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
       <div style={{ visibility: mounted ? "visible" : "hidden" }} className="w-full min-h-screen">

@@ -1,6 +1,6 @@
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -38,6 +38,8 @@ model Business {
   purchaseReturns  PurchaseReturn[]
   expenseCategories ExpenseCategory[]
   expenses         Expense[]
+  incomeCategories  IncomeCategory[]
+  incomes           Income[]
   stockTransfers   StockTransfer[]
   auditLogs        AuditLog[]
   notifications    Notification[]
@@ -77,10 +79,12 @@ model Branch {
   sales                Sale[]
   purchases            Purchase[]
   expenses             Expense[]
+  incomes              Income[]
   stockTransfersSource StockTransfer[] @relation("SourceBranch")
   stockTransfersTarget StockTransfer[] @relation("TargetBranch")
   customers            Customer[]
   openingStocks        OpeningStock[]
+  payments             Payment[]
 }
 
 model User {
@@ -95,6 +99,8 @@ model User {
   role         String     @default("CASHIER") // SUPER_ADMIN, OWNER, MANAGER, CASHIER, ACCOUNTANT, STOREKEEPER, SALESPERSON, DELIVERY
   phone        String?
   isActive     Boolean    @default(true)
+  allowedDeviceId String?
+  deviceName      String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
@@ -102,12 +108,14 @@ model User {
   sales      Sale[]
   purchases  Purchase[]
   expenses   Expense[]
+  incomes    Income[]
   auditLogs  AuditLog[]
   enteredOpeningStocks  OpeningStock[]  @relation("EnteredBy")
   approvedOpeningStocks OpeningStock[]  @relation("ApprovedBy")
   requestedTransfers    StockTransfer[] @relation("RequestedTransfers")
   approvedTransfers     StockTransfer[] @relation("ApprovedTransfers")
   receivedTransfers     StockTransfer[] @relation("ReceivedTransfers")
+  payments              Payment[]
 }
 
 model Category {
@@ -231,6 +239,7 @@ model Customer {
 
   sales        Sale[]
   ledgers      CustomerLedger[]
+  payments     Payment[]
 }
 
 model CustomerLedger {
@@ -264,6 +273,7 @@ model Supplier {
   ledgers     SupplierLedger[]
   openingStocks OpeningStock[]
   batches     Batch[]
+  payments    Payment[]
 }
 
 model SupplierLedger {
@@ -364,17 +374,28 @@ model PurchaseItem {
 }
 
 model Payment {
-  id         String    @id @default(uuid())
-  businessId String
-  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  saleId     String?
-  sale       Sale?     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  purchaseId String?
-  purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  amount     Float
-  method     String    @default("CASH") // CASH, CARD, QR, BANK_TRANSFER, CREDIT
-  reference  String?
-  createdAt  DateTime  @default(now())
+  id            String    @id @default(uuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  saleId        String?
+  sale          Sale?     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  purchaseId    String?
+  purchase      Purchase? @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplierId    String?
+  supplier      Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  branchId      String?
+  branch        Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  userId        String?   // receivedBy or sentBy
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  amount        Float
+  method        String    @default("CASH") // CASH, CARD, QR, BANK_TRANSFER, CREDIT
+  reference     String?   // Reference number
+  receiptNumber String?   // Receipt or voucher number
+  remarks       String?   // Notes/remarks
+  type          String    @default("RECEIVED") // RECEIVED or SENT
+  createdAt     DateTime  @default(now())
 }
 
 model SaleReturn {
@@ -443,6 +464,36 @@ model Expense {
   branch      Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   categoryId  String
   category    ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  reference   String?         // Voucher code or receipt number
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+}
+
+model IncomeCategory {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  incomes    Income[]
+}
+
+model Income {
+  id          String          @id @default(uuid())
+  businessId  String
+  business    Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branchId    String
+  branch      Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    IncomeCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   userId      String
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount      Float

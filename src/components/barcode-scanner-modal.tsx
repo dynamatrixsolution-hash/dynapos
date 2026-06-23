@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Camera, X, RefreshCw } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
@@ -22,6 +23,11 @@ export default function BarcodeScannerModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const [cameras, setCameras] = useState<any[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
@@ -198,17 +204,17 @@ export default function BarcodeScannerModal({
     setSelectedCameraId(cameras[nextIdx].id);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
       <div className="relative bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm flex flex-col items-center gap-4 text-white shadow-2xl overflow-hidden">
         {/* Animated slide down scanning indicators */}
-        <div className="absolute inset-x-0 top-0 h-1 bg-[#5e50eb] opacity-40 animate-pulse shadow-[0_0_15px_#5e50eb]" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-[#2563EB] opacity-40 animate-pulse shadow-[0_0_15px_#2563EB]" />
 
         <div className="flex justify-between items-center w-full pb-2 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <Camera className="h-4.5 w-4.5 text-[#5e50eb]" />
+            <Camera className="h-4.5 w-4.5 text-[#2563EB]" />
             <h3 className="text-xs font-bold tracking-wide">{title}</h3>
           </div>
           <div className="flex items-center">
@@ -242,7 +248,7 @@ export default function BarcodeScannerModal({
         <div className="relative w-full aspect-square max-w-[260px] bg-slate-950 border border-slate-850 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
           {loading && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950 text-slate-450 gap-2 p-4 text-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-[#5e50eb]" />
+              <RefreshCw className="h-6 w-6 animate-spin text-[#2563EB]" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Accessing Selected Camera...</span>
             </div>
           )}
@@ -258,7 +264,7 @@ export default function BarcodeScannerModal({
           {/* Aim Overlay Layout */}
           {!loading && !error && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-[85%] h-[65%] border-2 border-dashed border-[#5e50eb] rounded-lg relative flex items-center justify-center">
+              <div className="w-[85%] h-[65%] border-2 border-dashed border-[#2563EB] rounded-lg relative flex items-center justify-center">
                 {/* Horizontal scan line bar animation */}
                 <div className="absolute left-0 w-full h-[2px] bg-red-500 shadow-[0_0_10px_#ef4444] animate-bounce" style={{ animationDuration: "2.5s" }} />
               </div>
@@ -287,12 +293,13 @@ export default function BarcodeScannerModal({
                 onClose();
               }
             }}
-            className="w-full py-2.5 bg-[#5e50eb] hover:bg-[#4d3fd4] text-white rounded-xl text-xs font-black tracking-wide uppercase mt-1.5 shadow-lg shadow-[#5e50eb]/25 transition-all cursor-pointer"
+            className="w-full py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-black tracking-wide uppercase mt-1.5 shadow-lg shadow-[#2563EB]/25 transition-all cursor-pointer"
           >
             Finish Scanning
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

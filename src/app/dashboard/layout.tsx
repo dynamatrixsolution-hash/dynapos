@@ -41,14 +41,65 @@ export default async function DashboardLayout({
     orderBy: { name: "asc" },
   });
 
-  // Fetch unread notifications count
-  const unreadNotifications = await db.notification.findMany({
+  // Calculate active branch ID for low stock lookup
+  const activeBranchId = userBranchId || branches.find((b) => b.isMain)?.id || branches[0]?.id || null;
+
+  // Retrieve products and filter by low stock threshold for the active branch
+  const products = await db.product.findMany({
+    where: {
+      businessId,
+      deletedAt: null,
+    },
+    include: {
+      productStocks: activeBranchId ? {
+        where: { branchId: activeBranchId },
+      } : undefined,
+      unit: { select: { name: true } },
+    },
+  });
+
+  const lowStockAlerts = products
+    .map((prod) => {
+      const currentStock = prod.productStocks.reduce((sum, s) => sum + s.quantity, 0);
+      return {
+        id: prod.id,
+        name: prod.name,
+        currentStock,
+        alertQuantity: prod.alertQuantity,
+        unit: prod.unit?.name || "Pcs",
+      };
+    })
+    .filter((prod) => prod.currentStock <= prod.alertQuantity);
+
+  const lowStockNotifications = lowStockAlerts.map((alert) => ({
+    id: `low-stock-${alert.id}`,
+    title: "Low Stock Alert",
+    message: `${alert.name} is down to ${alert.currentStock} ${alert.unit} (Min: ${alert.alertQuantity})`,
+    type: "STOCK",
+    isRead: false,
+    createdAt: new Date(),
+  }));
+
+  // Fetch database unread notifications
+  const dbNotifications = await db.notification.findMany({
     where: {
       businessId,
       isRead: false,
     },
     orderBy: { createdAt: "desc" },
     take: 5,
+  });
+
+  const initialNotifications = [...lowStockNotifications, ...dbNotifications];
+
+  // Fetch subscription details
+  const subscription = await db.subscription.findUnique({
+    where: { businessId },
+    select: {
+      plan: true,
+      endDate: true,
+      status: true,
+    },
   });
 
   return (
@@ -60,7 +111,8 @@ export default async function DashboardLayout({
         branchId: (session.user as any).branchId,
       }}
       branches={branches}
-      initialNotifications={unreadNotifications}
+      initialNotifications={initialNotifications}
+      subscription={subscription}
     >
       <SettingsProvider>
         {children}

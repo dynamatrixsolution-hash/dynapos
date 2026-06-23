@@ -31,7 +31,23 @@ export async function GET(request: Request) {
     if (branchId) where.branchId = branchId;
     if (categoryId) where.categoryId = categoryId;
 
-    const [expenses, totalCount] = await Promise.all([
+    const summaryWhere: any = {
+      businessId: context.businessId,
+      deletedAt: null,
+    };
+    if (branchId) summaryWhere.branchId = branchId;
+    if (categoryId) summaryWhere.categoryId = categoryId;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [expenses, totalCount, totalSum, todaySum, monthSum] = await Promise.all([
       db.expense.findMany({
         where,
         include: {
@@ -44,6 +60,24 @@ export async function GET(request: Request) {
         take: limit,
       }),
       db.expense.count({ where }),
+      db.expense.aggregate({
+        where: summaryWhere,
+        _sum: { amount: true },
+      }),
+      db.expense.aggregate({
+        where: {
+          ...summaryWhere,
+          createdAt: { gte: todayStart, lte: todayEnd },
+        },
+        _sum: { amount: true },
+      }),
+      db.expense.aggregate({
+        where: {
+          ...summaryWhere,
+          createdAt: { gte: monthStart },
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
     return NextResponse.json({
@@ -53,6 +87,11 @@ export async function GET(request: Request) {
         totalPages: Math.ceil(totalCount / limit),
         currentPage: page,
         limit,
+      },
+      summary: {
+        total: totalSum._sum.amount ?? 0,
+        today: todaySum._sum.amount ?? 0,
+        thisMonth: monthSum._sum.amount ?? 0,
       },
     });
   } catch (error: any) {

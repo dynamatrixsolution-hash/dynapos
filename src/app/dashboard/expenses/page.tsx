@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useSettings } from "@/components/settings-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Tag, Coins, FileText, Calendar } from "lucide-react";
+import { Plus, Tag, Coins, FileText, Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 interface ExpenseItem {
@@ -44,10 +44,16 @@ export default function ExpensesPage() {
   const { currencySymbol } = useSettings();
   const currentBranchId = session?.user ? (session.user as any).branchId : null;
 
+  const [activeTab, setActiveTab] = React.useState<"expenses" | "income">("expenses");
   const [expenses, setExpenses] = React.useState<ExpenseItem[]>([]);
+  const [income, setIncome] = React.useState<ExpenseItem[]>([]);
   const [categories, setCategories] = React.useState<CategoryItem[]>([]);
+  const [incomeCategories, setIncomeCategories] = React.useState<CategoryItem[]>([]);
   const [branches, setBranches] = React.useState<BranchItem[]>([]);
   
+  const [expenseSummary, setExpenseSummary] = React.useState({ total: 0, today: 0, thisMonth: 0 });
+  const [incomeSummary, setIncomeSummary] = React.useState({ total: 0, today: 0, thisMonth: 0 });
+
   const [isLoading, setIsLoading] = React.useState(true);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [catModalOpen, setCatModalOpen] = React.useState(false);
@@ -67,26 +73,38 @@ export default function ExpensesPage() {
   const loadData = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const [expRes, catRes, brRes] = await Promise.all([
+      const [expRes, incRes, catRes, incCatRes, brRes] = await Promise.all([
         fetch("/api/v1/expenses?limit=50"),
+        fetch("/api/v1/income?limit=50"),
         fetch("/api/v1/expenses/categories"),
+        fetch("/api/v1/income/categories"),
         fetch("/api/v1/branches"),
       ]);
       
       if (expRes.ok) {
         const data = await expRes.json();
         setExpenses(data.expenses || []);
+        setExpenseSummary(data.summary || { total: 0, today: 0, thisMonth: 0 });
+      }
+      if (incRes.ok) {
+        const data = await incRes.json();
+        setIncome(data.incomes || []);
+        setIncomeSummary(data.summary || { total: 0, today: 0, thisMonth: 0 });
       }
       if (catRes.ok) {
         const data = await catRes.json();
         setCategories(data || []);
+      }
+      if (incCatRes.ok) {
+        const data = await incCatRes.json();
+        setIncomeCategories(data || []);
       }
       if (brRes.ok) {
         const data = await brRes.json();
         setBranches(data || []);
       }
     } catch (err) {
-      console.error("Failed to load expenses data:", err);
+      console.error("Failed to load expenses/income data:", err);
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +124,8 @@ export default function ExpensesPage() {
   const onSubmit = async (data: ExpenseInputs) => {
     setSubmitError(null);
     try {
-      const res = await fetch("/api/v1/expenses", {
+      const endpoint = activeTab === "expenses" ? "/api/v1/expenses" : "/api/v1/income";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -114,7 +133,7 @@ export default function ExpensesPage() {
 
       if (!res.ok) {
         const json = await res.json();
-        setSubmitError(json.error || "Failed to record expense");
+        setSubmitError(json.error || `Failed to record ${activeTab === "expenses" ? "expense" : "income"}`);
         return;
       }
 
@@ -131,7 +150,8 @@ export default function ExpensesPage() {
     if (!newCatName.trim()) return;
     
     try {
-      const res = await fetch("/api/v1/expenses/categories", {
+      const endpoint = activeTab === "expenses" ? "/api/v1/expenses/categories" : "/api/v1/income/categories";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newCatName }),
@@ -151,12 +171,44 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Tabs Switcher */}
+      <div className="flex space-x-2 border-b border-border/50 pb-2">
+        <button
+          onClick={() => {
+            setActiveTab("expenses");
+            reset();
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === "expenses" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary"
+          }`}
+        >
+          <TrendingDown className="h-4 w-4" />
+          Expenses
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("income");
+            reset();
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === "income" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary"
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" />
+          Income
+        </button>
+      </div>
+
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-card border border-border p-5 rounded-2xl">
         <div>
-          <h1 className="text-xl font-bold">Business Expenses Log</h1>
+          <h1 className="text-xl font-bold">
+            {activeTab === "expenses" ? "Business Expenses Log" : "Business Income Log"}
+          </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Log overhead costs, office supplies, utilities, and branch payouts.
+            {activeTab === "expenses"
+              ? "Log overhead costs, office supplies, utilities, and branch payouts."
+              : "Track additional business income and other cash inflows."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -175,38 +227,91 @@ export default function ExpensesPage() {
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground hover:bg-primary/95 rounded-xl text-xs font-black shadow-lg shadow-primary/20 transition-all uppercase tracking-wider"
           >
             <Plus className="h-4.5 w-4.5" />
-            Record Expense
+            {activeTab === "expenses" ? "Record Expense" : "Record Income"}
           </button>
         </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {activeTab === "expenses" ? (
+          <>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Expenses</span>
+              <div className="text-2xl font-black text-destructive">
+                -{currencySymbol}{expenseSummary.total.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Today's Expenses</span>
+              <div className="text-2xl font-black text-destructive">
+                -{currencySymbol}{expenseSummary.today.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">This Month's Expenses</span>
+              <div className="text-2xl font-black text-destructive">
+                -{currencySymbol}{expenseSummary.thisMonth.toFixed(2)}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Income</span>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-500">
+                +{currencySymbol}{incomeSummary.total.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Today's Income</span>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-500">
+                +{currencySymbol}{incomeSummary.today.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm space-y-1 hover:shadow-md transition-shadow">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">This Month's Income</span>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-500">
+                +{currencySymbol}{incomeSummary.thisMonth.toFixed(2)}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main List */}
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-bold flex items-center gap-2 pb-1.5 border-b border-border/60">
           <Coins className="h-4.5 w-4.5 text-primary" />
-          Outward Cash Flows
+          {activeTab === "expenses" ? "Outward Cash Flows" : "Incoming Cash Flows"}
         </h2>
 
         {isLoading ? (
-          <div className="py-12 text-center text-xs text-muted-foreground">Loading expenses catalog...</div>
-        ) : expenses.length === 0 ? (
-          <div className="py-12 text-center text-xs text-muted-foreground">No expenses recorded yet.</div>
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            {activeTab === "expenses" ? "Loading expenses catalog..." : "Loading income catalog..."}
+          </div>
+        ) : (activeTab === "expenses" ? expenses : income).length === 0 ? (
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            {activeTab === "expenses" ? "No expenses recorded yet." : "No income recorded yet."}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
                 <tr className="border-b border-border text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3 px-2">Expense Date</th>
+                  <th className="py-3 px-2">{activeTab === "expenses" ? "Expense Date" : "Income Date"}</th>
                   <th className="py-3 px-2">Category</th>
                   <th className="py-3 px-2">Branch</th>
                   <th className="py-3 px-2">Voucher / Ref</th>
                   <th className="py-3 px-2">Description</th>
-                  <th className="py-3 px-2 text-right">Amount Paid</th>
+                  <th className="py-3 px-2 text-right">
+                    {activeTab === "expenses" ? "Amount Paid" : "Amount Received"}
+                  </th>
                   <th className="py-3 px-2">Recorded By</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {expenses.map((e) => (
+                {(activeTab === "expenses" ? expenses : income).map((e) => (
                   <tr key={e.id} className="hover:bg-secondary/10">
                     <td className="py-3 px-2 text-muted-foreground">
                       {new Date(e.createdAt).toLocaleDateString()}
@@ -221,8 +326,10 @@ export default function ExpensesPage() {
                     </td>
                     <td className="py-3 px-2 font-semibold text-primary">{e.reference || "None"}</td>
                     <td className="py-3 px-2 text-muted-foreground max-w-xs truncate">{e.description || "None"}</td>
-                    <td className="py-3 px-2 text-right font-black text-destructive">
-                      -{currencySymbol}{e.amount.toFixed(2)}
+                    <td className={`py-3 px-2 text-right font-black ${
+                      activeTab === "expenses" ? "text-destructive" : "text-emerald-600 dark:text-emerald-500"
+                    }`}>
+                      {activeTab === "expenses" ? "-" : "+"}{currencySymbol}{e.amount.toFixed(2)}
                     </td>
                     <td className="py-3 px-2 text-muted-foreground">{e.user.name}</td>
                   </tr>
@@ -233,14 +340,18 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      {/* Record Expense Modal */}
+      {/* Record Expense/Income Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md space-y-4">
             <div>
-              <h3 className="text-sm font-bold">Record Cash Outflow Voucher</h3>
+              <h3 className="text-sm font-bold">
+                {activeTab === "expenses" ? "Record Cash Outflow Voucher" : "Record Cash Inflow Voucher"}
+              </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Register a cash expenditure voucher against branch funds.
+                {activeTab === "expenses"
+                  ? "Register a cash expenditure voucher against branch funds."
+                  : "Register a cash income voucher against branch funds."}
               </p>
             </div>
 
@@ -248,7 +359,7 @@ export default function ExpensesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Expense Amount ({currencySymbol})
+                    {activeTab === "expenses" ? "Expense Amount" : "Income Amount"} ({currencySymbol})
                   </label>
                   <input
                     type="number"
@@ -275,7 +386,7 @@ export default function ExpensesPage() {
                     }`}
                   >
                     <option value="">Select Category</option>
-                    {categories.map((c) => (
+                    {(activeTab === "expenses" ? categories : incomeCategories).map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -328,7 +439,11 @@ export default function ExpensesPage() {
                   Description
                 </label>
                 <textarea
-                  placeholder="Purchased lightbulbs for storefront..."
+                  placeholder={
+                    activeTab === "expenses"
+                      ? "Purchased lightbulbs for storefront..."
+                      : "Received service fee from client..."
+                  }
                   {...register("description")}
                   className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-background focus:outline-none h-16 resize-none"
                 />
@@ -365,15 +480,19 @@ export default function ExpensesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
           <div className="bg-card border border-border rounded-xl p-5 w-full max-w-sm space-y-4">
             <div>
-              <h3 className="text-sm font-bold">Add Expense Category</h3>
+              <h3 className="text-sm font-bold">
+                {activeTab === "expenses" ? "Add Expense Category" : "Add Income Category"}
+              </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Register a new general categorization label for overheads.
+                {activeTab === "expenses"
+                  ? "Register a new general categorization label for overheads."
+                  : "Register a new general categorization label for income."}
               </p>
             </div>
             <form onSubmit={handleAddCategory} className="space-y-4">
               <input
                 type="text"
-                placeholder="e.g. Marketing / Rent"
+                placeholder={activeTab === "expenses" ? "e.g. Marketing / Rent" : "e.g. Service Income / Commission"}
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-xs focus:outline-none"

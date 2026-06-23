@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
+    --background: 210 20% 98%; /* #F8FAFC */
+    --foreground: 222 47% 11%; /* #0F172A */
+    --card: 0 0% 100%; /* #FFFFFF */
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%; /* Vivid Blue */
+    --primary: 221 83% 53%; /* #2563EB Bright Blue */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    --secondary: 198 93% 60%; /* #38BDF8 Sky Blue */
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    --accent: 162 76% 41%; /* #10B981 Accent Teal */
     --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84.2% 60.2%; /* #EF4444 Danger Red */
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 220 14% 92%; /* #E5E7EB Gray */
+    --input: 210 20% 98%; /* #F9FAFB Input Background */
     --ring: 221 83% 53%;
-    --radius: 0.75rem;
+    --radius: 1.25rem; /* 20px */
   }
 
   .dark {
@@ -154,8 +154,8 @@
   left: 6%;
   right: 6%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #5e50eb, #5e50eb, transparent);
-  box-shadow: 0 0 8px #5e50eb, 0 0 12px #5e50eb;
+  background: linear-gradient(90deg, transparent, #2563EB, #2563EB, transparent);
+  box-shadow: 0 0 8px #2563EB, 0 0 12px #2563EB;
   animation: qr-scan 3s ease-in-out infinite;
 }
 
@@ -163,7 +163,7 @@
   position: absolute;
   width: 16px;
   height: 16px;
-  border-color: #5e50eb;
+  border-color: #2563EB;
   border-style: solid;
   pointer-events: none;
 }

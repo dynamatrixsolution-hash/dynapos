@@ -170,17 +170,67 @@ export const navigationConfig: NavItem[] = [
   // Payments - Manager, Owner
   {
     title: "Payments",
-    href: "/dashboard/payments",
     icon: CreditCard,
     roles: ["OWNER", "MANAGER"],
+    children: [
+      {
+        title: "Payment Received",
+        href: "/dashboard/payments/received",
+        icon: CreditCard,
+        roles: ["OWNER", "MANAGER"],
+      },
+      {
+        title: "Payment Sent",
+        href: "/dashboard/payments/sent",
+        icon: CreditCard,
+        roles: ["OWNER", "MANAGER"],
+      },
+    ],
   },
 
   // Reports - Manager, Owner, Super Admin
   {
     title: "Reports",
-    href: "/dashboard/reports",
     icon: BarChart3,
     roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+    children: [
+      {
+        title: "Daily Reports",
+        href: "/dashboard/reports/daily",
+        icon: TrendingUp,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        title: "Transaction Reports",
+        href: "/dashboard/reports/transactions",
+        icon: ClipboardList,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        title: "Outstanding Reports",
+        href: "/dashboard/reports/outstanding",
+        icon: AlertTriangle,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        title: "Accounting Reports",
+        href: "/dashboard/reports/accounting",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        title: "Inventory Reports",
+        href: "/dashboard/reports/inventory",
+        icon: Boxes,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        title: "Other Reports",
+        href: "/dashboard/reports/other",
+        icon: PieChart,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+    ],
   },
 
   // Expenses - Manager and above

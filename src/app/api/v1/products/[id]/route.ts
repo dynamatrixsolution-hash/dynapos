@@ -6,8 +6,8 @@ import { logActivity } from "@/lib/activity-logger";
 
 const productUpdateSchema = z.object({
   name: z.string().min(2, "Product name must be at least 2 characters").optional(),
-  sku: z.string().optional(),
-  barcode: z.string().optional(),
+  sku: z.string().optional().nullable(),
+  barcode: z.string().optional().nullable(),
   description: z.string().optional(),
   costPrice: z.number().nonnegative().optional(),
   sellingPrice: z.number().nonnegative().optional(),

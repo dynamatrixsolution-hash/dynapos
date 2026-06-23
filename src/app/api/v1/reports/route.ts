@@ -115,6 +115,20 @@ export async function GET(request: Request) {
     const totalExpenses = expensesAggregate._sum.amount || 0;
     const totalExpensesCount = expensesAggregate._count.id || 0;
 
+    // 3b. Income Aggregates
+    const incomeAggregate = await db.income.aggregate({
+      where: whereClauseCommon,
+      _sum: {
+        amount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalIncome = incomeAggregate._sum.amount || 0;
+    const totalIncomeCount = incomeAggregate._count.id || 0;
+
     // Expenses by Category
     const expensesByCategoryGroup = await db.expense.groupBy({
       by: ["categoryId"],
@@ -160,7 +174,7 @@ export async function GET(request: Request) {
 
     const costOfGoodsSold = saleItems.reduce((sum, item) => sum + item.quantity * item.costPrice, 0);
     const grossProfit = totalSales - costOfGoodsSold;
-    const netProfit = grossProfit - totalExpenses;
+    const netProfit = grossProfit + totalIncome - totalExpenses;
 
     // 5. Product-wise sales summary
     const topSalesItems = await db.saleItem.groupBy({
@@ -218,6 +232,10 @@ export async function GET(request: Request) {
         total: totalExpenses,
         count: totalExpensesCount,
         byCategory: expensesByCategory,
+      },
+      income: {
+        total: totalIncome,
+        count: totalIncomeCount,
       },
       margins: {
         costOfGoodsSold,
