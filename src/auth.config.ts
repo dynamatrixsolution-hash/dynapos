@@ -18,6 +18,14 @@ export const authConfig = {
           const role = (auth.user as any)?.role || "CASHIER";
           const path = nextUrl.pathname;
 
+          // SUPER_ADMIN Route Protection: Prevent non-SUPER_ADMIN users from accessing platform admin settings
+          if (path.startsWith("/dashboard/super-admin")) {
+            if (role !== "SUPER_ADMIN") {
+              const redirectPath = role === "CASHIER" ? "/dashboard/pos" : "/dashboard";
+              return Response.redirect(new URL(redirectPath, nextUrl));
+            }
+          }
+
           // CASHIER Route Protection: Cashiers can access POS, Sales, Products, Customers, and Inventory
           if (role === "CASHIER") {
             const allowedPaths = [

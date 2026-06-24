@@ -297,6 +297,7 @@ export default function POSPage() {
   const [qtyMultiplier, setQtyMultiplier] = React.useState<number>(1);
   const [holdName, setHoldName] = React.useState<string>("");
   const [heldBills, setHeldBills] = React.useState<HeldBill[]>([]);
+  const [activeMobileTab, setActiveMobileTab] = React.useState<"catalog" | "cart">("catalog");
 
   // Localized configuration state from SettingsProvider context is now defined at the top of the component
 
@@ -916,11 +917,13 @@ export default function POSPage() {
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden no-print">
         
         {/* LEFT SECTION (75% screen width): Product grids & Category catalog */}
-        <div className="flex-1 lg:flex-[3] flex flex-col gap-4 bg-white dark:bg-[#0a0f24] rounded-[32px] p-5 border border-slate-200/50 dark:border-slate-800/80 shadow-sm min-h-0 overflow-hidden">
+        <div className={`flex-1 lg:flex-[3] flex flex-col gap-4 bg-white dark:bg-[#0a0f24] rounded-[32px] p-5 border border-slate-200/50 dark:border-slate-800/80 shadow-sm min-h-0 overflow-hidden ${
+          activeMobileTab === "catalog" ? "flex" : "hidden lg:flex"
+        }`}>
           
           {/* Row 1: Left toggle trigger menu bar shortcuts */}
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-3 flex-1 min-w-[300px]">
+            <div className="flex items-center gap-3 flex-1 min-w-[200px]">
               
               {/* Sidebar collapse button */}
               <button
@@ -932,34 +935,36 @@ export default function POSPage() {
               </button>
 
               {/* Modern High-Fidelity Search Wrapper matching the image */}
-              <div className="relative flex-1 flex items-center bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden h-11">
-                <Search className="absolute left-3.5 h-4.5 w-4.5 text-slate-400" />
+              <div className="flex-1 flex items-center bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs h-11 px-3.5">
+                <Search className="h-4.5 w-4.5 text-slate-400 shrink-0 mr-2.5" />
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search products by name, barcode..."
+                  placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-32 py-2.5 bg-transparent text-xs text-foreground placeholder-slate-400 focus:outline-none"
+                  className="flex-1 bg-transparent text-xs text-foreground placeholder-slate-400 focus:outline-none min-w-0 font-medium"
                   suppressHydrationWarning
                 />
-                {/* Inline Barcode Scanner button */}
-                <button
-                  type="button"
-                  onClick={() => setPosScannerOpen(true)}
-                  className="absolute right-20 text-slate-400 hover:text-[#2563EB] cursor-pointer p-1.5 transition-all"
-                  title="Scan Barcode with Camera (F9)"
-                >
-                  <Barcode className="h-4.5 w-4.5" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  {/* Inline Barcode Scanner button */}
+                  <button
+                    type="button"
+                    onClick={() => setPosScannerOpen(true)}
+                    className="text-slate-400 hover:text-[#2563EB] cursor-pointer p-1.5 transition-all"
+                    title="Scan Barcode with Camera (F9)"
+                  >
+                    <Barcode className="h-4.5 w-4.5" />
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setDebouncedQuery(searchQuery)}
-                  className="absolute right-1 px-4 h-9 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg font-bold text-xs cursor-pointer transition-all shadow-xs"
-                >
-                  Search
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setDebouncedQuery(searchQuery)}
+                    className="px-4 h-8 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg font-bold text-xs cursor-pointer transition-all shadow-xs"
+                  >
+                    Search
+                  </button>
+                </div>
               </div>
 
               {/* Sliders filter settings button (matching the image filter button) */}
@@ -968,7 +973,7 @@ export default function POSPage() {
                 onClick={() => {
                   setViewMode((prev) => (prev === "grid" ? "compact" : prev === "compact" ? "list" : "grid"));
                 }}
-                className="bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-11 h-11 flex items-center justify-center rounded-xl text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0 shadow-xs cursor-pointer transition-all"
+                className="bg-[#F9FAFB] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-11 h-11 flex items-center justify-center rounded-xl text-slate-600 dark:text-slate-355 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0 shadow-xs cursor-pointer transition-all"
                 title={`Toggle View Mode (Current: ${viewMode})`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500 dark:text-slate-400"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="2" y1="14" x2="6" y2="14"></line><line x1="10" y1="8" x2="14" y2="8"></line><line x1="18" y1="16" x2="22" y2="16"></line></svg>
@@ -1153,8 +1158,8 @@ export default function POSPage() {
               <div
                 className={`grid gap-4 ${
                   viewMode === "compact"
-                    ? "grid-cols-3 sm:grid-cols-4 xl:grid-cols-5"
-                    : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
+                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                    : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4"
                 }`}
               >
                 {filteredProducts.slice(0, visibleCount).map((prod) => {
@@ -1170,7 +1175,7 @@ export default function POSPage() {
                     <div
                       key={prod.id}
                       onClick={() => addToCart(prod)}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-3.5 flex flex-col justify-between hover:shadow-lg hover:border-[#2563EB]/25 hover:scale-[1.01] cursor-pointer relative group transition-all duration-300"
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 flex flex-col justify-between hover:shadow-lg hover:border-[#2563EB]/25 hover:scale-[1.01] cursor-pointer relative group transition-all duration-300"
                     >
                       {/* Pharmacy Info helpers badge */}
                       {isPharmacy && (
@@ -1216,7 +1221,7 @@ export default function POSPage() {
 
                       {/* Standard Image Representation exactly like image */}
                       {viewMode !== "compact" ? (
-                        <div className="w-full aspect-[4/3] bg-[#f3f4f6] dark:bg-slate-950 rounded-2xl flex items-center justify-center overflow-hidden mb-3.5 select-none shrink-0 border border-slate-200/40 dark:border-slate-800/40 relative">
+                        <div className="w-full aspect-[4/3] bg-[#f3f4f6] dark:bg-slate-950 rounded-xl flex items-center justify-center overflow-hidden mb-2 select-none shrink-0 border border-slate-200/40 dark:border-slate-800/40 relative">
                           {stock <= 0 && (
                             <span className="absolute top-2.5 right-2.5 bg-red-500 text-white font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs z-10 select-none">
                               OUT
@@ -1229,24 +1234,24 @@ export default function POSPage() {
                               className="max-h-[85%] max-w-[85%] object-contain transition-transform group-hover:scale-105 duration-250"
                             />
                           ) : (
-                            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#2563EB]/10 text-[#2563EB] dark:bg-[#2563EB]/20 dark:text-purple-400 text-xs font-black uppercase tracking-wider select-none">
+                            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#2563EB]/10 text-[#2563EB] dark:bg-[#2563EB]/20 dark:text-purple-400 text-xs font-black uppercase tracking-wider select-none">
                               {prod.name.slice(0, 2)}
                             </div>
                           )}
                         </div>
                       ) : (
                         /* Compact view simple visual separator */
-                        <div className="h-1.5 w-full bg-[#f3f4f6] dark:bg-slate-800/30 rounded mb-2.5 shrink-0" />
+                        <div className="h-1.5 w-full bg-[#f3f4f6] dark:bg-slate-800/30 rounded mb-1 shrink-0" />
                       )}
 
                       {/* Product text details */}
-                      <div className="space-y-1 text-left w-full mt-2">
+                      <div className="space-y-1 text-left w-full mt-1.5">
                         <h4 className={`font-extrabold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2 tracking-tight ${
                           viewMode === "compact" ? "text-[10px]" : "text-xs"
                         }`}>
                           {prod.name}
                         </h4>
-                        <div className="flex justify-between items-center pt-1.5">
+                        <div className="flex justify-between items-center pt-1">
                           <span className="text-xs font-black text-[#2563EB] dark:text-purple-400">
                             {currencySymbol}{prod.sellingPrice.toFixed(2)}
                           </span>
@@ -1285,7 +1290,9 @@ export default function POSPage() {
         </div>
 
         {/* RIGHT SECTION (25% screen width): Billing checkout panel */}
-        <div className="w-full lg:w-[400px] flex flex-col bg-white dark:bg-[#0a0f24] border border-slate-200/60 dark:border-slate-800 rounded-[32px] p-5 min-h-0 overflow-hidden shadow-xs shrink-0 no-print">
+        <div className={`w-full lg:w-[400px] flex flex-col bg-white dark:bg-[#0a0f24] border border-slate-200/60 dark:border-slate-800 rounded-[32px] p-5 min-h-0 overflow-hidden shadow-xs shrink-0 no-print ${
+          activeMobileTab === "cart" ? "flex" : "hidden lg:flex"
+        }`}>
           
           {/* Metadata information card */}
           <div className="border-b border-slate-150 dark:border-slate-800/80 pb-3.5 mb-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex justify-between">
@@ -2483,6 +2490,40 @@ export default function POSPage() {
         title="POS Camera Barcode Scanner"
         continuous={true}
       />
+
+      {/* Mobile Tab Switcher */}
+      <div className="lg:hidden shrink-0 bg-white dark:bg-[#0a0f24] border-t border-slate-200 dark:border-slate-800 p-2 flex gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] z-20">
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab("catalog")}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            activeMobileTab === "catalog"
+              ? "bg-[#2563EB] text-white"
+              : "bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800"
+          }`}
+        >
+          <Grid className="h-4 w-4" />
+          Catalog ({filteredProducts.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab("cart")}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 relative ${
+            activeMobileTab === "cart"
+              ? "bg-[#2563EB] text-white"
+              : "bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800"
+          }`}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          Active Cart
+          {currentOrder.cart.length > 0 && (
+            <span className="bg-red-500 text-white font-extrabold text-[9px] h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center border border-white dark:border-[#0a0f24] shadow-xs">
+              {currentOrder.cart.reduce((sum, item) => sum + item.quantity, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
     </div>
   );
 }

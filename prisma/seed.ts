@@ -6,6 +6,37 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding started...");
 
+  // 0. Clear existing data to make seed re-runnable
+  console.log("Clearing existing data...");
+  try { await prisma.customerLedger.deleteMany({}); } catch (e) {}
+  try { await prisma.supplierLedger.deleteMany({}); } catch (e) {}
+  try { await prisma.payment.deleteMany({}); } catch (e) {}
+  try { await prisma.saleItem.deleteMany({}); } catch (e) {}
+  try { await prisma.saleReturn.deleteMany({}); } catch (e) {}
+  try { await prisma.sale.deleteMany({}); } catch (e) {}
+  try { await prisma.purchaseItem.deleteMany({}); } catch (e) {}
+  try { await prisma.purchaseReturn.deleteMany({}); } catch (e) {}
+  try { await prisma.purchase.deleteMany({}); } catch (e) {}
+  try { await prisma.expense.deleteMany({}); } catch (e) {}
+  try { await prisma.expenseCategory.deleteMany({}); } catch (e) {}
+  try { await prisma.income.deleteMany({}); } catch (e) {}
+  try { await prisma.incomeCategory.deleteMany({}); } catch (e) {}
+  try { await prisma.openingStock.deleteMany({}); } catch (e) {}
+  try { await prisma.batch.deleteMany({}); } catch (e) {}
+  try { await prisma.productStock.deleteMany({}); } catch (e) {}
+  try { await prisma.product.deleteMany({}); } catch (e) {}
+  try { await prisma.category.deleteMany({}); } catch (e) {}
+  try { await prisma.brand.deleteMany({}); } catch (e) {}
+  try { await prisma.unit.deleteMany({}); } catch (e) {}
+  try { await prisma.customer.deleteMany({}); } catch (e) {}
+  try { await prisma.supplier.deleteMany({}); } catch (e) {}
+  try { await prisma.auditLog.deleteMany({}); } catch (e) {}
+  try { await prisma.notification.deleteMany({}); } catch (e) {}
+  try { await prisma.user.deleteMany({}); } catch (e) {}
+  try { await prisma.branch.deleteMany({}); } catch (e) {}
+  try { await prisma.subscription.deleteMany({}); } catch (e) {}
+  try { await prisma.business.deleteMany({}); } catch (e) {}
+
   // 1. Create Business
   const business = await prisma.business.upsert({
     where: { slug: "dynapos-retail-demo" },
@@ -67,10 +98,64 @@ async function main() {
 
   console.log(`Branches created: ${mainBranch.name}, ${warehouseBranch.name}`);
 
-  // 4. Create Users (hashed password: "admin123" for owner, "cashier123" for cashier)
+  // 4. Create Platform Business and Super Admin (hashed password: "superadmin123")
   const salt = bcrypt.genSaltSync(10);
+  const superAdminHash = bcrypt.hashSync("superadmin123", salt);
   const ownerHash = bcrypt.hashSync("admin123", salt);
   const cashierHash = bcrypt.hashSync("cashier123", salt);
+
+  const platformBusiness = await prisma.business.upsert({
+    where: { slug: "platform-admin" },
+    update: {},
+    create: {
+      name: "DynaPOS Platform Admin",
+      slug: "platform-admin",
+      phone: "+1-800-555-0100",
+      email: "admin@dynapos.com",
+      address: "DynaPOS Headquarters",
+      currency: "USD",
+      taxConfig: { taxName: "VAT", rate: 0 },
+      settings: {},
+    },
+  });
+
+  await prisma.subscription.upsert({
+    where: { businessId: platformBusiness.id },
+    update: {},
+    create: {
+      businessId: platformBusiness.id,
+      plan: "ENTERPRISE",
+      status: "ACTIVE",
+      startDate: new Date(),
+      endDate: oneYearFromNow,
+      userLimit: 100,
+      branchLimit: 20,
+    },
+  });
+
+  const platformBranch = await prisma.branch.create({
+    data: {
+      businessId: platformBusiness.id,
+      name: "Platform HQ",
+      phone: "+1-800-555-0100",
+      address: "DynaPOS HQ",
+      isMain: true,
+    },
+  });
+
+  const superAdmin = await prisma.user.upsert({
+    where: { email: "superadmin@dynapos.com" },
+    update: {},
+    create: {
+      businessId: platformBusiness.id,
+      branchId: platformBranch.id,
+      name: "System Super Admin",
+      email: "superadmin@dynapos.com",
+      passwordHash: superAdminHash,
+      role: "SUPER_ADMIN",
+      phone: "+1-800-555-0100",
+    },
+  });
 
   const owner = await prisma.user.upsert({
     where: { email: "owner@dynapos.com" },
@@ -100,7 +185,7 @@ async function main() {
     },
   });
 
-  console.log(`Users created: ${owner.email} (Owner), ${cashier.email} (Cashier)`);
+  console.log(`Users created: ${superAdmin.email} (Super Admin), ${owner.email} (Owner), ${cashier.email} (Cashier)`);
 
   // 5. Create Categories
   const produce = await prisma.category.create({

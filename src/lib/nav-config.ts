@@ -302,6 +302,19 @@ export const navigationConfig: NavItem[] = [
     roles: ["MANAGER"],
   },
   {
+    title: "Platform Admin",
+    icon: Shield,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "Businesses",
+        href: "/dashboard/super-admin/businesses",
+        icon: Store,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+  {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,

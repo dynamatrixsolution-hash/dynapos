@@ -305,7 +305,7 @@ export default function DashboardShellClient({
             >
               <Menu className="h-6 w-6" />
             </button>
-            <div className="md:hidden font-bold text-xl text-[#2563EB]">DynaOne</div>
+            <div className="md:hidden font-bold text-base sm:text-xl text-[#2563EB] shrink-0">DynaOne</div>
             
             {activeBranch && (
               <div className="relative">
@@ -319,7 +319,7 @@ export default function DashboardShellClient({
                       <div className="flex items-center justify-center p-1 bg-[#2563EB]/10 dark:bg-[#2563EB]/20 rounded-lg text-[#2563EB] dark:text-purple-400 shrink-0">
                         <Store className="h-3.5 w-3.5" />
                       </div>
-                      <span className="max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
+                      <span className="max-w-[80px] sm:max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
                       <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                     </button>
                     {branchDropdownOpen && (
@@ -353,7 +353,7 @@ export default function DashboardShellClient({
                     <div className="flex items-center justify-center p-1 bg-[#2563EB]/10 dark:bg-[#2563EB]/20 rounded-lg text-[#2563EB] dark:text-purple-400 shrink-0">
                       <Store className="h-3.5 w-3.5" />
                     </div>
-                    <span className="max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
+                    <span className="max-w-[80px] sm:max-w-[120px] truncate text-slate-800 dark:text-slate-200 font-extrabold">{activeBranch.name}</span>
                   </div>
                 )}
               </div>
@@ -362,11 +362,13 @@ export default function DashboardShellClient({
 
           <div className="flex items-center gap-2 md:gap-4">
             {subscription && (
-              <SubscriptionTimer
-                endDate={subscription.endDate}
-                plan={subscription.plan}
-                status={subscription.status}
-              />
+              <div className="hidden sm:block shrink-0">
+                <SubscriptionTimer
+                  endDate={subscription.endDate}
+                  plan={subscription.plan}
+                  status={subscription.status}
+                />
+              </div>
             )}
             {/* Theme switcher removed */}
 
