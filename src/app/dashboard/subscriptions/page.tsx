@@ -28,6 +28,15 @@ interface SubscriptionDetails {
     branchCount: number;
     userCount: number;
   };
+  plans: {
+    id: string;
+    name: string;
+    price: number;
+    currency: string;
+    duration: string;
+    desc: string;
+    features?: Record<string, boolean>;
+  }[];
 }
 
 export default function SubscriptionsPage() {
@@ -38,58 +47,57 @@ export default function SubscriptionsPage() {
   const [errorMsg, setErrorMsg] = React.useState("");
   const [successMsg, setSuccessMsg] = React.useState("");
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
-  const [selectedPlan, setSelectedPlan] = React.useState<{ name: string; price: string } | null>(null);
+  const [selectedPlan, setSelectedPlan] = React.useState<any | null>(null);
+
+  const loadSubscription = async () => {
+    try {
+      const res = await fetch("/api/v1/subscriptions");
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      } else {
+        setErrorMsg("Failed to load subscription metrics");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Network error loading subscription metrics");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   React.useEffect(() => {
-    async function loadSubscription() {
-      try {
-        const res = await fetch("/api/v1/subscriptions");
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        } else {
-          setErrorMsg("Failed to load subscription metrics");
-        }
-      } catch (err) {
-        console.error(err);
-        setErrorMsg("Network error loading subscription metrics");
-      } finally {
-        setIsLoading(false);
-      }
-    }
     loadSubscription();
   }, []);
 
-  const triggerUpgrade = (planName: string, price: string) => {
-    setSelectedPlan({ name: planName, price });
+  const triggerUpgrade = (plan: any) => {
+    setSelectedPlan(plan);
     setShowUpgradeModal(true);
   };
 
   const confirmUpgrade = async () => {
     if (!selectedPlan || !data) return;
     
-    // Simulate updating subscription plan in database
-    // In production, this would direct to Stripe or process payment endpoint
     setIsLoading(true);
     setShowUpgradeModal(false);
     
     try {
-      // Mock an update via console/timeout or let's assume we can trigger a state change for demonstration
-      setSuccessMsg(`Congratulations! Your workspace has been upgraded to the "${selectedPlan.name}" plan.`);
-      
-      // Update local state to reflect the upgrade
-      setData({
-        ...data,
-        subscription: {
-          ...data.subscription,
-          plan: selectedPlan.name.toUpperCase().replace(" ", "_"),
-          branchLimit: selectedPlan.name === "Professional Pro" ? 5 : 20,
-          userLimit: selectedPlan.name === "Professional Pro" ? 15 : 100,
-        }
+      const res = await fetch("/api/v1/subscriptions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: selectedPlan.id }),
       });
-    } catch (err) {
+      
+      const resJson = await res.json();
+      if (!res.ok) {
+        throw new Error(resJson.error || "Failed to upgrade subscription");
+      }
+
+      setSuccessMsg(`Congratulations! Your workspace has been upgraded to the "${selectedPlan.name}" plan.`);
+      loadSubscription();
+    } catch (err: any) {
       console.error(err);
-      setErrorMsg("Failed to upgrade subscription");
+      setErrorMsg(err.message || "Failed to upgrade subscription");
     } finally {
       setIsLoading(false);
     }
@@ -125,44 +133,38 @@ export default function SubscriptionsPage() {
       )
     : 0;
 
-  const plansList = [
-    {
-      name: "Free Trial",
-      price: "$0",
-      period: "30 days",
-      features: ["1 Operating Branch", "Up to 5 Users", "Basic POS checkout", "Daily Reporting"],
-      active: activePlan === "FREE_TRIAL" || activePlan === "FREE",
-      disabled: activePlan !== "FREE_TRIAL" && activePlan !== "FREE",
-    },
-    {
-      name: "Professional Pro",
-      price: "$49",
-      period: "per month",
-      features: [
-        "Up to 5 Operating Branches",
-        "Up to 15 Registered Users",
-        "Inventory Expiry Alerts",
-        "Supplier & Customer Ledger",
-        "Advanced Profit/Loss Analytics",
-      ],
-      active: activePlan === "PROFESSIONAL_PRO" || activePlan === "BASIC",
-      disabled: false,
-    },
-    {
-      name: "Enterprise Scaling",
-      price: "$149",
-      period: "per month",
-      features: [
-        "Up to 20 Operating Branches",
-        "Up to 100 Registered Users",
-        "Stock Transfer Approval Queues",
-        "Custom OpenAPI endpoint keys",
-        "24/7 Dedicated Priority Phone Support",
-      ],
-      active: activePlan === "ENTERPRISE_SCALING" || activePlan === "ENTERPRISE",
-      disabled: false,
-    },
-  ];
+  const platformPlans = data?.plans || [];
+  const plansList = platformPlans.map((plan) => {
+    const isCurrentActive =
+      activePlan.toUpperCase() === plan.id.toUpperCase() ||
+      activePlan.toUpperCase() === plan.name.toUpperCase() ||
+      (activePlan === "FREE_TRIAL" && plan.id === "Starter");
+
+    const planFeatures = Object.keys(plan.features || {}).filter(f => plan.features?.[f] !== false);
+    
+    let featuresList = planFeatures;
+    if (planFeatures.length === 0) {
+      if (plan.id === "Starter") {
+        featuresList = ["1 Operating Branch", "Up to 5 Users", "Basic POS checkout", "Daily Reporting"];
+      } else if (plan.id === "Business") {
+        featuresList = ["Up to 5 Operating Branches", "Up to 15 Registered Users", "Inventory Expiry Alerts", "Supplier & Customer Ledger", "Advanced Profit/Loss Analytics"];
+      } else if (plan.id === "Professional") {
+        featuresList = ["Up to 20 Operating Branches", "Up to 100 Registered Users", "Stock Transfer Approval Queues", "Custom OpenAPI endpoint keys", "24/7 Dedicated Priority Phone Support"];
+      } else {
+        featuresList = ["Unlimited Operating Branches", "Unlimited Registered Users", "All SaaS Modules Enabled", "Dedicated Backup Storage", "Priority Dedicated Support line"];
+      }
+    }
+
+    return {
+      id: plan.id,
+      name: plan.name,
+      price: `$${plan.price}`,
+      period: plan.duration || "1 Month",
+      features: featuresList,
+      active: isCurrentActive,
+      disabled: plan.id === "Starter" && !isCurrentActive,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -318,7 +320,7 @@ export default function SubscriptionsPage() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => triggerUpgrade(plan.name, plan.price)}
+                    onClick={() => triggerUpgrade(plan)}
                     disabled={plan.disabled}
                     className={`w-full py-2 rounded-xl text-xs font-black transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 ${
                       plan.disabled

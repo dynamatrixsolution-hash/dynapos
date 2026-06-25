@@ -21,6 +21,12 @@ import {
   TrendingUp,
   Boxes,
   PieChart,
+  Building,
+  DollarSign,
+  HelpCircle,
+  Ticket,
+  FileText,
+  Terminal,
 } from "lucide-react";
 
 export type Role = "SUPER_ADMIN" | "OWNER" | "MANAGER" | "CASHIER";
@@ -30,6 +36,7 @@ export interface NavItem {
   href?: string;
   icon: React.ElementType;
   roles: Role[];
+  feature?: string;
   children?: NavItem[];
 }
 
@@ -39,7 +46,7 @@ export interface NavItem {
  * CASHIER: POS Billing, Products, Sales History, Inventory, Customers
  * MANAGER: All services (limited to assigned warehouse)
  * OWNER: All services + Branch management + User management
- * SUPER_ADMIN: Dashboard, Branches view, Users/Employees view, Reports view only
+ * SUPER_ADMIN: Dashboard, Business Management, Subscription Management, Revenue & Payments, Users, Support, Activity Logs, Platform Settings, Monitoring
  */
 export const navigationConfig: NavItem[] = [
   // Dashboard - Available to Manager, Owner, Super Admin
@@ -56,6 +63,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/pos",
     icon: ShoppingCart,
     roles: ["OWNER", "MANAGER", "CASHIER"],
+    feature: "POS Billing",
   },
 
   // Products - Cashier, Manager, Owner (Cashier has view-only access)
@@ -64,6 +72,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/products",
     icon: Package,
     roles: ["OWNER", "MANAGER", "CASHIER"],
+    feature: "Products",
   },
 
   // Category & Unit - Manager and above
@@ -72,6 +81,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/categories",
     icon: Layers,
     roles: ["OWNER", "MANAGER"],
+    feature: "Products",
   },
 
   // Purchase - Manager and above
@@ -80,6 +90,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/purchases",
     icon: ShoppingCart,
     roles: ["OWNER", "MANAGER"],
+    feature: "Purchases",
   },
 
   // Inventory - Cashier, Manager, Owner
@@ -87,6 +98,7 @@ export const navigationConfig: NavItem[] = [
     title: "Inventory",
     icon: Store,
     roles: ["OWNER", "MANAGER", "CASHIER"],
+    feature: "Inventory",
     children: [
       {
         title: "Overview",
@@ -117,12 +129,14 @@ export const navigationConfig: NavItem[] = [
         href: "/dashboard/inventory/batch-stock",
         icon: Layers,
         roles: ["OWNER", "MANAGER", "CASHIER"],
+        feature: "Batch Tracking",
       },
       {
         title: "Damage & Expiry",
         href: "/dashboard/inventory/damage-expiry",
         icon: AlertTriangle,
         roles: ["OWNER", "MANAGER", "CASHIER"],
+        feature: "Expiry Tracking",
       },
       {
         title: "Stock Value Report",
@@ -147,6 +161,7 @@ export const navigationConfig: NavItem[] = [
         href: "/dashboard/inventory/transfers",
         icon: Truck,
         roles: ["OWNER", "MANAGER", "CASHIER"],
+        feature: "Multi Branch",
       },
     ],
   },
@@ -157,6 +172,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/customers",
     icon: Users,
     roles: ["OWNER", "MANAGER", "CASHIER"],
+    feature: "Customers",
   },
 
   // Suppliers - Manager and above
@@ -165,6 +181,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/suppliers",
     icon: Truck,
     roles: ["OWNER", "MANAGER"],
+    feature: "Suppliers",
   },
 
   // Payments - Manager, Owner
@@ -172,6 +189,7 @@ export const navigationConfig: NavItem[] = [
     title: "Payments",
     icon: CreditCard,
     roles: ["OWNER", "MANAGER"],
+    feature: "Payments",
     children: [
       {
         title: "Payment Received",
@@ -188,47 +206,48 @@ export const navigationConfig: NavItem[] = [
     ],
   },
 
-  // Reports - Manager, Owner, Super Admin
+  // Reports - Manager, Owner (SUPER_ADMIN removed as they have dedicated Revenue reports)
   {
     title: "Reports",
     icon: BarChart3,
-    roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+    roles: ["OWNER", "MANAGER"],
+    feature: "Reports",
     children: [
       {
         title: "Daily Reports",
         href: "/dashboard/reports/daily",
         icon: TrendingUp,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
       {
         title: "Transaction Reports",
         href: "/dashboard/reports/transactions",
         icon: ClipboardList,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
       {
         title: "Outstanding Reports",
         href: "/dashboard/reports/outstanding",
         icon: AlertTriangle,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
       {
         title: "Accounting Reports",
         href: "/dashboard/reports/accounting",
         icon: Receipt,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
       {
         title: "Inventory Reports",
         href: "/dashboard/reports/inventory",
         icon: Boxes,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
       {
         title: "Other Reports",
         href: "/dashboard/reports/other",
         icon: PieChart,
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+        roles: ["OWNER", "MANAGER"],
       },
     ],
   },
@@ -239,6 +258,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/expenses",
     icon: Receipt,
     roles: ["OWNER", "MANAGER"],
+    feature: "Expenses",
   },
 
   // Sales History - Cashier view
@@ -247,6 +267,7 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/sales",
     icon: History,
     roles: ["CASHIER"],
+    feature: "POS Billing",
   },
 
   // Branches Management - Owner only
@@ -255,19 +276,20 @@ export const navigationConfig: NavItem[] = [
     href: "/dashboard/branches",
     icon: GitBranch,
     roles: ["OWNER"],
+    feature: "Multi Branch",
   },
 
-  // Users & Roles - Owner and Super Admin
+  // Users & Roles - Owner only (SUPER_ADMIN removed)
   {
     title: "Users & Roles",
     icon: Shield,
-    roles: ["SUPER_ADMIN", "OWNER"],
+    roles: ["OWNER"],
     children: [
       {
         title: "User List",
         href: "/dashboard/users",
         icon: Users,
-        roles: ["SUPER_ADMIN", "OWNER"],
+        roles: ["OWNER"],
       },
       {
         title: "Roles & Permissions",
@@ -280,18 +302,21 @@ export const navigationConfig: NavItem[] = [
         href: "/dashboard/users/branches",
         icon: GitBranch,
         roles: ["OWNER"],
+        feature: "Multi Branch",
       },
       {
         title: "Device Control",
         href: "/dashboard/users/devices",
         icon: Laptop,
         roles: ["OWNER"],
+        feature: "Device Control",
       },
       {
         title: "Activity Log",
         href: "/dashboard/users/activity",
         icon: Activity,
         roles: ["OWNER"],
+        feature: "Activity Logs",
       },
     ],
   },
@@ -302,22 +327,172 @@ export const navigationConfig: NavItem[] = [
     roles: ["MANAGER"],
   },
   {
-    title: "Platform Admin",
-    icon: Shield,
-    roles: ["SUPER_ADMIN"],
-    children: [
-      {
-        title: "Businesses",
-        href: "/dashboard/super-admin/businesses",
-        icon: Store,
-        roles: ["SUPER_ADMIN"],
-      },
-    ],
+    title: "Subscription",
+    href: "/dashboard/subscriptions",
+    icon: CreditCard,
+    roles: ["OWNER"],
   },
   {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
-    roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+    roles: ["OWNER", "MANAGER"],
+  },
+
+  // ==========================================
+  // SUPER ADMIN PORTAL NAVIGATION ITEMS
+  // ==========================================
+
+  // Business Management
+  {
+    title: "Business Management",
+    icon: Building,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "All Businesses",
+        href: "/dashboard/super-admin/businesses?tab=all",
+        icon: Store,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Add Business",
+        href: "/dashboard/super-admin/businesses?tab=add",
+        icon: Building,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Suspended Businesses",
+        href: "/dashboard/super-admin/businesses?tab=suspended",
+        icon: AlertTriangle,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+
+  // Subscription Management
+  {
+    title: "Subscription Management",
+    icon: CreditCard,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "Plans",
+        href: "/dashboard/super-admin/subscriptions?tab=plans",
+        icon: Layers,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Feature Toggles",
+        href: "/dashboard/super-admin/subscriptions?tab=toggles",
+        icon: Shield,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Plan Limits",
+        href: "/dashboard/super-admin/subscriptions?tab=limits",
+        icon: Laptop,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Currency Management",
+        href: "/dashboard/super-admin/subscriptions?tab=currency",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+
+  // Revenue & Payments
+  {
+    title: "Revenue & Payments",
+    icon: DollarSign,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "Revenue Overview",
+        href: "/dashboard/super-admin/revenue?tab=overview",
+        icon: TrendingUp,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Business Payments",
+        href: "/dashboard/super-admin/revenue?tab=payments",
+        icon: DollarSign,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Invoices",
+        href: "/dashboard/super-admin/revenue?tab=invoices",
+        icon: FileText,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+
+  // User Management
+  {
+    title: "User Management",
+    icon: Users,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "Business Owners",
+        href: "/dashboard/super-admin/users?tab=owners",
+        icon: Users,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Active Users",
+        href: "/dashboard/super-admin/users?tab=active",
+        icon: Laptop,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+
+  // Support Center
+  {
+    title: "Support Center",
+    icon: HelpCircle,
+    roles: ["SUPER_ADMIN"],
+    children: [
+      {
+        title: "Tickets",
+        href: "/dashboard/super-admin/support?tab=tickets",
+        icon: Ticket,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Announcements",
+        href: "/dashboard/super-admin/support?tab=announcements",
+        icon: AlertTriangle,
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+
+  // Activity Logs
+  {
+    title: "Activity Logs",
+    href: "/dashboard/super-admin/activity-logs",
+    icon: Activity,
+    roles: ["SUPER_ADMIN"],
+  },
+
+  // Platform Settings
+  {
+    title: "Platform Settings",
+    href: "/dashboard/super-admin/settings",
+    icon: Settings,
+    roles: ["SUPER_ADMIN"],
+  },
+
+  // System Monitoring
+  {
+    title: "System Monitoring",
+    href: "/dashboard/super-admin/monitoring",
+    icon: Terminal,
+    roles: ["SUPER_ADMIN"],
   },
 ];

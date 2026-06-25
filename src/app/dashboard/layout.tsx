@@ -102,6 +102,149 @@ export default async function DashboardLayout({
     },
   });
 
+  // Fetch current business settings (for custom overrides)
+  const business = await db.business.findUnique({
+    where: { id: businessId },
+    select: { settings: true },
+  });
+
+  // Fetch platform settings (for global default plan configurations)
+  const platform = await db.business.findUnique({
+    where: { slug: "platform-admin" },
+    select: { settings: true },
+  });
+
+  const settings = (business?.settings as any) || {};
+  const platformSettings = (platform?.settings as any) || {};
+
+  const currentPlanName = subscription?.plan || "FREE_TRIAL";
+
+  // Normalizes plan IDs/names to resolve legacy aliases cleanly
+  const normalizePlan = (name: string) => {
+    const val = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (val.includes("trial") || val.includes("free") || val === "basic" || val === "starter") return "starter";
+    if (val.includes("pro") || val.includes("professional")) return "professional";
+    if (val.includes("enterprise") || val.includes("scaling")) return "enterprise";
+    if (val.includes("business")) return "business";
+    return val;
+  };
+
+  // Staged baseline features if the superadmin settings plans lack configured features
+  const getDefaultFeatures = (planName: string) => {
+    const p = normalizePlan(planName);
+    
+    if (p === "starter") {
+      return {
+        "POS Billing": true,
+        "Products": true,
+        "Customers": true,
+        "Reports": true,
+        "Inventory": false,
+        "Purchases": false,
+        "Suppliers": false,
+        "Expenses": false,
+        "Payments": false,
+        "Multi Branch": false,
+        "Warehouses": false,
+        "Device Control": false,
+        "Activity Logs": false,
+        "Barcode": false,
+        "Batch Tracking": false,
+        "Expiry Tracking": false,
+        "API Access": false,
+        "Backup System": false,
+      };
+    }
+    
+    if (p === "business") {
+      return {
+        "POS Billing": true,
+        "Products": true,
+        "Inventory": true,
+        "Purchases": true,
+        "Customers": true,
+        "Suppliers": true,
+        "Reports": true,
+        "Expenses": true,
+        "Payments": true,
+        "Multi Branch": false,
+        "Warehouses": false,
+        "Device Control": false,
+        "Activity Logs": true,
+        "Barcode": true,
+        "Batch Tracking": false,
+        "Expiry Tracking": false,
+        "API Access": false,
+        "Backup System": false,
+      };
+    }
+
+    if (p === "professional") {
+      return {
+        "POS Billing": true,
+        "Products": true,
+        "Inventory": true,
+        "Purchases": true,
+        "Customers": true,
+        "Suppliers": true,
+        "Reports": true,
+        "Expenses": true,
+        "Payments": true,
+        "Multi Branch": true,
+        "Warehouses": true,
+        "Device Control": true,
+        "Activity Logs": true,
+        "Barcode": true,
+        "Batch Tracking": true,
+        "Expiry Tracking": true,
+        "API Access": false,
+        "Backup System": true,
+      };
+    }
+
+    // Enterprise / default fallback
+    return {
+      "POS Billing": true,
+      "Products": true,
+      "Inventory": true,
+      "Purchases": true,
+      "Customers": true,
+      "Suppliers": true,
+      "Reports": true,
+      "Expenses": true,
+      "Payments": true,
+      "Multi Branch": true,
+      "Warehouses": true,
+      "Device Control": true,
+      "Activity Logs": true,
+      "Barcode": true,
+      "Batch Tracking": true,
+      "Expiry Tracking": true,
+      "API Access": true,
+      "Backup System": true,
+    };
+  };
+
+  // 1. Get baseline features of this business's plan
+  const plans = platformSettings.plans || [];
+  const matchingPlan = plans.find((p: any) => {
+    const pId = normalizePlan(p.id || "");
+    const pName = normalizePlan(p.name || "");
+    const sPlan = normalizePlan(currentPlanName);
+    return pId === sPlan || pName === sPlan;
+  });
+
+  const baseFeatures = (matchingPlan?.features && Object.keys(matchingPlan.features).length > 0)
+    ? matchingPlan.features
+    : getDefaultFeatures(currentPlanName);
+
+  // 2. Merge with custom overrides
+  const customFeatures = settings.customFeatures || {};
+  const mergedFeatures = {
+    ...baseFeatures,
+    ...customFeatures,
+  };
+
   return (
     <DashboardShellClient
       user={{
@@ -113,6 +256,7 @@ export default async function DashboardLayout({
       branches={branches}
       initialNotifications={initialNotifications}
       subscription={subscription}
+      features={mergedFeatures}
     >
       <SettingsProvider>
         {children}

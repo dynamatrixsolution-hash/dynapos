@@ -1,26 +1,17 @@
 import { auth } from "@/auth";
-import LandingClient from "./landing-client";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "DynaOne | Premium POS & ERP Platform for Growing Businesses",
-  description:
-    "Manage sales, inventory, purchases, payments, accounting, and multi-branch operations from one powerful, unified POS & ERP platform. Inspired by the best SaaS systems.",
-  keywords: [
-    "POS",
-    "ERP",
-    "Point of Sale",
-    "Inventory Management",
-    "Retail",
-    "Pharmacy Software",
-    "Multi-branch POS",
-    "Accounting Software",
-  ],
-  authors: [{ name: "DynaOne Systems Inc." }],
-};
-
-export default async function LandingPage() {
+export default async function Page() {
   const session = await auth();
-  const isLoggedIn = !!session?.user;
 
-  return <LandingClient isLoggedIn={isLoggedIn} />;
+  if (!session?.user) {
+    redirect("/auth/login");
+  }
+
+  const role = (session.user as any)?.role || "CASHIER";
+  if (role === "CASHIER") {
+    redirect("/dashboard/pos");
+  } else {
+    redirect("/dashboard");
+  }
 }

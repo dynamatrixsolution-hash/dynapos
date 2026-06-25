@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useSession } from "next-auth/react";
 import { useSettings } from "@/components/settings-provider";
+import SuperAdminDashboard from "@/components/super-admin-dashboard";
 import {
   TrendingUp,
   DollarSign,
@@ -63,8 +64,10 @@ interface TopProductMeta {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { currencySymbol } = useSettings();
+
+  const userRole = (session?.user as any)?.role;
   
   const [metrics, setMetrics] = React.useState<DashboardMetrics | null>(null);
   const [alerts, setAlerts] = React.useState<AlertMeta[]>([]);
@@ -77,6 +80,11 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     setMounted(true);
+    
+    if (userRole === "SUPER_ADMIN") {
+      setIsLoading(false);
+      return;
+    }
     
     async function loadDashboard() {
       try {
@@ -96,10 +104,12 @@ export default function DashboardPage() {
       }
     }
     
-    loadDashboard();
-  }, []);
+    if (sessionStatus !== "loading") {
+      loadDashboard();
+    }
+  }, [sessionStatus, userRole]);
 
-  if (isLoading) {
+  if (sessionStatus === "loading" || isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center space-y-2">
@@ -108,6 +118,10 @@ export default function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  if (userRole === "SUPER_ADMIN") {
+    return <SuperAdminDashboard />;
   }
 
   const netProfitPositive = metrics ? metrics.netProfit >= 0 : true;

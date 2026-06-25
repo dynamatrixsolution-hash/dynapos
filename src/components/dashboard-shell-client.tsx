@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useTheme } from "./theme-provider";
 import { motion, AnimatePresence } from "framer-motion";
 import { navigationConfig, NavItem, Role } from "@/lib/nav-config";
 import {
@@ -118,15 +117,16 @@ export default function DashboardShellClient({
   branches,
   initialNotifications,
   subscription,
+  features,
 }: {
   children: React.ReactNode;
   user: UserMeta;
   branches: BranchMeta[];
   initialNotifications: any[];
   subscription?: SubscriptionMeta | null;
+  features?: Record<string, boolean>;
 }) {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
   const { update } = useSession();
   
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -165,9 +165,36 @@ export default function DashboardShellClient({
   
   const [notifications, setNotifications] = React.useState<NotificationMeta[]>(initialNotifications);
 
-  // Filter navigation by user role
+  // Filter navigation by user role and active features
   const userRole = (user.role as Role) || "CASHIER";
-  const allowedNavigation = navigationConfig.filter((item) => item.roles.includes(userRole));
+  const allowedNavigation = React.useMemo(() => {
+    return navigationConfig
+      .filter((item) => {
+        // 1. Role check
+        if (!item.roles.includes(userRole)) return false;
+        // 2. Plan feature check
+        if (userRole !== "SUPER_ADMIN" && item.feature && features && features[item.feature] === false) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => {
+        if (item.children) {
+          return {
+            ...item,
+            children: item.children.filter((child) => {
+              // Check subitem roles and features
+              if (!child.roles.includes(userRole)) return false;
+              if (userRole !== "SUPER_ADMIN" && child.feature && features && features[child.feature] === false) {
+                return false;
+              }
+              return true;
+            }),
+          };
+        }
+        return item;
+      });
+  }, [userRole, features]);
 
   const handleBranchSwitch = async (branch: BranchMeta) => {
     setActiveBranch(branch);
@@ -307,7 +334,7 @@ export default function DashboardShellClient({
             </button>
             <div className="md:hidden font-bold text-base sm:text-xl text-[#2563EB] shrink-0">DynaOne</div>
             
-            {activeBranch && (
+            {activeBranch && user.role !== "SUPER_ADMIN" && (
               <div className="relative">
                 {/* Only show switch option for owners; non-owners see read-only badge */}
                 {["SUPER_ADMIN", "OWNER"].includes(userRole) ? (
@@ -349,7 +376,7 @@ export default function DashboardShellClient({
                   </>
                 ) : (
                   /* Non-owners see only their assigned warehouse as read-only */
-                  <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold cursor-default select-none">
+                  <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold cursor-default select-none">
                     <div className="flex items-center justify-center p-1 bg-[#2563EB]/10 dark:bg-[#2563EB]/20 rounded-lg text-[#2563EB] dark:text-purple-400 shrink-0">
                       <Store className="h-3.5 w-3.5" />
                     </div>
@@ -361,7 +388,7 @@ export default function DashboardShellClient({
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            {subscription && (
+            {subscription && user.role !== "SUPER_ADMIN" && (
               <div className="hidden sm:block shrink-0">
                 <SubscriptionTimer
                   endDate={subscription.endDate}
@@ -452,7 +479,7 @@ export default function DashboardShellClient({
           </div>
         </header>
 
-        <main className={`flex-1 overflow-y-auto bg-background z-10 relative ${isPosRoute ? "p-0" : "p-4 md:p-6"}`}>
+        <main className={`flex-1 overflow-y-auto bg-background relative ${isPosRoute ? "p-0" : "p-4 md:p-6"}`}>
           {children}
         </main>
       </div>
