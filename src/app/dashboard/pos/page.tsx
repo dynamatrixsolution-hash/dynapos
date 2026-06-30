@@ -143,6 +143,40 @@ export default function POSPage() {
   const [posScannerOpen, setPosScannerOpen] = React.useState(false);
   const [scanToast, setScanToast] = React.useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // Custom Alert / Confirm popup state
+  interface AlertModalState {
+    open: boolean;
+    title: string;
+    message: string;
+    type: "info" | "error" | "confirm";
+    onConfirm?: () => void;
+  }
+  const [alertModal, setAlertModal] = React.useState<AlertModalState>({
+    open: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: "info" | "error" = "info") => {
+    setAlertModal({
+      open: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setAlertModal({
+      open: true,
+      title,
+      message,
+      type: "confirm",
+      onConfirm,
+    });
+  };
+
   React.useEffect(() => {
     if (scanToast) {
       const timer = setTimeout(() => setScanToast(null), 2200);
@@ -895,25 +929,31 @@ export default function POSPage() {
       setNewEmail("");
       setCustModalOpen(false);
     } catch (_) {
-      alert("Customer registration network failure.");
+      showAlert("Network Error", "Customer registration network failure.", "error");
     }
   };
 
   const handleNewOrder = () => {
-    if (
-      currentOrder.cart.length > 0 &&
-      !confirm("Are you sure you want to discard this cart items?")
-    ) {
-      return;
+    const proceedNewOrder = () => {
+      updateCurrentOrder((o) => ({
+        ...o,
+        cart: [],
+        selectedCustomerId: "",
+        overallDiscount: 0,
+        invoiceNotes: "",
+        splitPayments: { cash: 0, card: 0, qr: 0, bank: 0, credit: 0 },
+      }));
+    };
+
+    if (currentOrder.cart.length > 0) {
+      showConfirm(
+        "Discard Cart Items",
+        "Are you sure you want to discard this cart items?",
+        proceedNewOrder
+      );
+    } else {
+      proceedNewOrder();
     }
-    updateCurrentOrder((o) => ({
-      ...o,
-      cart: [],
-      selectedCustomerId: "",
-      overallDiscount: 0,
-      invoiceNotes: "",
-      splitPayments: { cash: 0, card: 0, qr: 0, bank: 0, credit: 0 },
-    }));
   };
 
   return (
@@ -1441,11 +1481,15 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm("Are you sure you want to clear the shopping cart?")) {
-                      updateCurrentOrder((o) => ({ ...o, cart: [] }));
-                      setIsAmountTenderedManuallySet(false);
-                      setAmountTendered(0);
-                    }
+                    showConfirm(
+                      "Clear Shopping Cart",
+                      "Are you sure you want to clear the shopping cart?",
+                      () => {
+                        updateCurrentOrder((o) => ({ ...o, cart: [] }));
+                        setIsAmountTenderedManuallySet(false);
+                        setAmountTendered(0);
+                      }
+                    );
                   }}
                   className="p-1.5 border border-red-200 hover:bg-red-500/10 text-red-500 rounded-lg cursor-pointer transition-all"
                   title="Clear Shopping Cart (Esc)"
@@ -2550,6 +2594,67 @@ export default function POSPage() {
         </button>
       </div>
 
+      {/* Custom Alert/Confirm Popup Modal */}
+      {alertModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                alertModal.type === "error"
+                  ? "bg-red-500/10 text-red-650 dark:text-red-400"
+                  : alertModal.type === "confirm"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              }`}>
+                {alertModal.type === "error" ? (
+                  <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+                ) : alertModal.type === "confirm" ? (
+                  <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+                ) : (
+                  <Info className="h-6 w-6 stroke-[2.5]" />
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-black text-slate-850 dark:text-slate-100">{alertModal.title}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                  {alertModal.message}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2.5 mt-2">
+              {alertModal.type === "confirm" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+                    className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlertModal((prev) => ({ ...prev, open: false }));
+                      if (alertModal.onConfirm) alertModal.onConfirm();
+                    }}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                >
+                  OK
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

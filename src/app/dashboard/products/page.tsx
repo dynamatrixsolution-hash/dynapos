@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Search, Plus, Trash2, Tag, Percent, Barcode, Boxes, Edit, Camera, FileSpreadsheet, Upload, Download, Loader2 } from "lucide-react";
+import { Search, Plus, Trash2, Tag, Percent, Barcode, Boxes, Edit, Camera, FileSpreadsheet, Upload, Download, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useSettings } from "@/components/settings-provider";
 import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
@@ -88,6 +88,40 @@ export default function ProductsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const isPending = isLoading || isSubmitting || isDeleting || importing;
+
+  // Custom Alert / Confirm popup state
+  interface AlertModalState {
+    open: boolean;
+    title: string;
+    message: string;
+    type: "info" | "error" | "confirm";
+    onConfirm?: () => void;
+  }
+  const [alertModal, setAlertModal] = React.useState<AlertModalState>({
+    open: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, message: string, type: "info" | "error" = "info") => {
+    setAlertModal({
+      open: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setAlertModal({
+      open: true,
+      title,
+      message,
+      type: "confirm",
+      onConfirm,
+    });
+  };
 
   React.useEffect(() => {
     setMounted(true);
@@ -260,24 +294,28 @@ export default function ProductsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    showConfirm(
+      "Confirm Delete",
+      "Are you sure you want to permanently delete this product? This action cannot be undone.",
+      async () => {
+        setIsDeleting(true);
+        try {
+          const res = await fetch(`/api/v1/products/${id}`, {
+            method: "DELETE",
+          });
 
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`/api/v1/products/${id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        loadData();
-      } else {
-        alert("Failed to delete product.");
+          if (res.ok) {
+            loadData();
+          } else {
+            showAlert("Error", "Failed to delete product.", "error");
+          }
+        } catch (err) {
+          showAlert("Error", "Error connecting to API.", "error");
+        } finally {
+          setIsDeleting(false);
+        }
       }
-    } catch (err) {
-      alert("Error connecting to API.");
-    } finally {
-      setIsDeleting(false);
-    }
+    );
   };
 
   const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1179,6 +1217,68 @@ export default function ProductsPage() {
               >
                 {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Import ${importPreview.length} Products`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert/Confirm Popup Modal */}
+      {alertModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                alertModal.type === "error"
+                  ? "bg-destructive/10 text-destructive"
+                  : alertModal.type === "confirm"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "bg-primary/10 text-primary"
+              }`}>
+                {alertModal.type === "error" ? (
+                  <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+                ) : alertModal.type === "confirm" ? (
+                  <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+                ) : (
+                  <Info className="h-6 w-6 stroke-[2.5]" />
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-black text-foreground">{alertModal.title}</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                  {alertModal.message}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2.5 mt-2">
+              {alertModal.type === "confirm" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+                    className="flex-1 py-2.5 border border-border text-xs rounded-xl hover:bg-secondary font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlertModal((prev) => ({ ...prev, open: false }));
+                      if (alertModal.onConfirm) alertModal.onConfirm();
+                    }}
+                    className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+                  className="w-full py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                >
+                  OK
+                </button>
+              )}
             </div>
           </div>
         </div>

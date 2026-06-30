@@ -19,6 +19,7 @@ import {
   Store,
   AlertTriangle,
   Clock,
+  User,
 } from "lucide-react";
 
 interface UserMeta {
@@ -133,6 +134,7 @@ export default function DashboardShellClient({
   const [profileDropdownOpen, setProfileDropdownOpen] = React.useState(false);
   const [branchDropdownOpen, setBranchDropdownOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
 
   const isPosRoute = pathname === "/dashboard/pos";
   const [posSidebarOpen, setPosSidebarOpen] = React.useState(false);
@@ -312,7 +314,7 @@ export default function DashboardShellClient({
         </nav>
         <div className="p-4 border-t border-slate-800 bg-[#111827]">
           <button
-            onClick={() => signOut({ callbackUrl: "/auth/login" })}
+            onClick={() => setLogoutConfirmOpen(true)}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 font-bold transition-colors cursor-pointer"
           >
             <LogOut className="h-5 w-5" />
@@ -465,9 +467,20 @@ export default function DashboardShellClient({
                       <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{user.name}</div>
                       <div className="text-[10px] text-slate-450 dark:text-slate-500 truncate mt-0.5">{user.email}</div>
                     </div>
+                    <Link
+                      href="/dashboard/profile"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl mt-1.5 font-bold transition-colors cursor-pointer"
+                    >
+                      <User className="h-4 w-4 text-slate-400" />
+                      My Profile
+                    </Link>
                     <button
-                      onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                      className="flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl mt-1.5 font-bold transition-colors cursor-pointer"
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        setLogoutConfirmOpen(true);
+                      }}
+                      className="flex items-center gap-2.5 w-full text-left px-3 py-2.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl mt-1 font-bold transition-colors cursor-pointer"
                     >
                       <LogOut className="h-4 w-4" />
                       Sign Out
@@ -522,7 +535,10 @@ export default function DashboardShellClient({
               </nav>
               <div className="p-4 border-t border-slate-800">
                 <button
-                  onClick={() => signOut({ callbackUrl: "/auth/login" })}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLogoutConfirmOpen(true);
+                  }}
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 font-bold transition-colors cursor-pointer"
                 >
                   <LogOut className="h-5 w-5" />
@@ -533,6 +549,41 @@ export default function DashboardShellClient({
           </>
         )}
       </AnimatePresence>
+
+      {/* Logout Confirmation Modal */}
+      {logoutConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-black text-slate-850 dark:text-slate-100">Confirm Logout</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                  Are you sure you want to log out of your session? You will need to sign in again to access the dashboard.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setLogoutConfirmOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/auth/login" })}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
