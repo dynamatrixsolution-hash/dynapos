@@ -88,6 +88,7 @@ export default function ProductsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const isPending = isLoading || isSubmitting || isDeleting || importing;
+  const isMutating = isSubmitting || isDeleting || importing;
 
   // Custom Alert / Confirm popup state
   interface AlertModalState {
@@ -519,7 +520,7 @@ export default function ProductsPage() {
               placeholder="Search products by SKU, name, or barcode..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              disabled={isPending}
+              disabled={isMutating}
               className="pl-10 w-full px-4 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               suppressHydrationWarning
             />
@@ -530,7 +531,7 @@ export default function ProductsPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              disabled={isPending}
+              disabled={isMutating}
               className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary h-[38px] font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">All Categories</option>
@@ -547,7 +548,7 @@ export default function ProductsPage() {
             <select
               value={selectedSubcategory}
               onChange={(e) => setSelectedSubcategory(e.target.value)}
-              disabled={isPending}
+              disabled={isMutating}
               className="w-full px-3 py-2 border border-border rounded-lg text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary h-[38px] font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">All Subcategories</option>
@@ -564,7 +565,7 @@ export default function ProductsPage() {
           {/* Low Stock Toggle */}
           <button
             onClick={() => setOnlyLowStock(!onlyLowStock)}
-            disabled={isPending}
+            disabled={isMutating}
             className={`px-4 py-2 border rounded-lg text-xs font-bold transition-all h-[38px] flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               onlyLowStock 
                 ? "bg-destructive/10 text-destructive border-destructive/30" 

@@ -148,7 +148,9 @@ export default function POSPage() {
     open: boolean;
     title: string;
     message: string;
-    type: "info" | "error" | "confirm";
+    type: "info" | "error" | "confirm" | "prompt";
+    defaultValue?: string;
+    onPromptSubmit?: (value: string) => void;
     onConfirm?: () => void;
   }
   const [alertModal, setAlertModal] = React.useState<AlertModalState>({
@@ -157,6 +159,10 @@ export default function POSPage() {
     message: "",
     type: "info",
   });
+
+  const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
+  const [discountModalAmount, setDiscountModalAmount] = React.useState("");
+  const [discountModalType, setDiscountModalType] = React.useState<"FLAT" | "PERCENTAGE">("FLAT");
 
   const showAlert = (title: string, message: string, type: "info" | "error" = "info") => {
     setAlertModal({
@@ -174,6 +180,17 @@ export default function POSPage() {
       message,
       type: "confirm",
       onConfirm,
+    });
+  };
+
+  const showPrompt = (title: string, message: string, defaultValue: string, onPromptSubmit: (value: string) => void) => {
+    setAlertModal({
+      open: true,
+      title,
+      message,
+      type: "prompt",
+      defaultValue,
+      onPromptSubmit,
     });
   };
 
@@ -1605,8 +1622,12 @@ export default function POSPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            const noteVal = prompt(`Add comments for ${item.name}:`, item.notes || "");
-                            if (noteVal !== null) updateItemNotes(item.id, noteVal);
+                            showPrompt(
+                              "Item Comments",
+                              `Add comments for ${item.name}:`,
+                              item.notes || "",
+                              (val) => updateItemNotes(item.id, val)
+                            );
                           }}
                           className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                             item.notes
@@ -1622,11 +1643,12 @@ export default function POSPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            const discVal = prompt(
+                            showPrompt(
+                              "Item Discount",
                               `Enter flat discount per unit (${currencySymbol}) for ${item.name}:`,
-                              item.discount.toString()
+                              item.discount.toString(),
+                              (val) => updateItemDiscount(item.id, parseFloat(val) || 0)
                             );
-                            if (discVal !== null) updateItemDiscount(item.id, parseFloat(discVal) || 0);
                           }}
                           className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                             item.discount > 0
@@ -1662,16 +1684,9 @@ export default function POSPage() {
                     <span>Discount :</span>
                     <button
                       onClick={() => {
-                        const amt = prompt(
-                          `Enter Extra Discount amount (as flat or percentage based on mode):`,
-                          currentOrder.overallDiscount.toString()
-                        );
-                        if (amt !== null) {
-                          const typeVal = confirm(`Is this a PERCENTAGE discount? Click OK for %, Cancel for Flat ${currencySymbol}`)
-                            ? "PERCENTAGE"
-                            : "FLAT";
-                          handleDiscountConfig(parseFloat(amt) || 0, typeVal);
-                        }
+                        setDiscountModalAmount(currentOrder.overallDiscount.toString());
+                        setDiscountModalType(currentOrder.discountType || "FLAT");
+                        setDiscountModalOpen(true);
                       }}
                       className="hover:text-[#2563EB] transition-all cursor-pointer p-0.5"
                       title="Edit Extra Discount"
@@ -2621,8 +2636,50 @@ export default function POSPage() {
                 </p>
               </div>
             </div>
+
+            {alertModal.type === "prompt" && (
+              <div className="w-full">
+                <input
+                  type="text"
+                  id="modal-prompt-input"
+                  defaultValue={alertModal.defaultValue || ""}
+                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all text-slate-800 dark:text-slate-100 font-bold"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = (e.target as HTMLInputElement).value;
+                      setAlertModal((prev) => ({ ...prev, open: false }));
+                      if (alertModal.onPromptSubmit) alertModal.onPromptSubmit(val);
+                    }
+                  }}
+                />
+              </div>
+            )}
+
             <div className="flex gap-2.5 mt-2">
-              {alertModal.type === "confirm" ? (
+              {alertModal.type === "prompt" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
+                    className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inputEl = document.getElementById("modal-prompt-input") as HTMLInputElement;
+                      const val = inputEl ? inputEl.value : "";
+                      setAlertModal((prev) => ({ ...prev, open: false }));
+                      if (alertModal.onPromptSubmit) alertModal.onPromptSubmit(val);
+                    }}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    Submit
+                  </button>
+                </>
+              ) : alertModal.type === "confirm" ? (
                 <>
                   <button
                     type="button"
@@ -2651,6 +2708,89 @@ export default function POSPage() {
                   OK
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extra Invoice Discount Modal */}
+      {discountModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div>
+              <h4 className="text-base font-black text-slate-850 dark:text-slate-100">Extra Discount</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-semibold">
+                Configure the extra overall discount for the current sales ticket.
+              </p>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Discount Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDiscountModalType("FLAT")}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      discountModalType === "FLAT"
+                        ? "bg-blue-600 text-white border-transparent shadow-xs"
+                        : "border-slate-200 dark:border-slate-850 hover:bg-slate-50 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    Flat ({currencySymbol})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountModalType("PERCENTAGE")}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      discountModalType === "PERCENTAGE"
+                        ? "bg-blue-600 text-white border-transparent shadow-xs"
+                        : "border-slate-200 dark:border-slate-850 hover:bg-slate-50 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    Percentage (%)
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Discount Value</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={discountModalAmount}
+                  onChange={(e) => setDiscountModalAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-slate-800 dark:text-slate-100"
+                  placeholder="Enter discount amount"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleDiscountConfig(parseFloat(discountModalAmount) || 0, discountModalType);
+                      setDiscountModalOpen(false);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setDiscountModalOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDiscountConfig(parseFloat(discountModalAmount) || 0, discountModalType);
+                  setDiscountModalOpen(false);
+                }}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+              >
+                Apply Discount
+              </button>
             </div>
           </div>
         </div>

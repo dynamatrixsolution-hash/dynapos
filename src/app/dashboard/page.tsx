@@ -111,10 +111,77 @@ export default function DashboardPage() {
 
   if (sessionStatus === "loading" || isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-xs text-muted-foreground">Aggregating business metrics...</p>
+      <div className="space-y-6 animate-pulse">
+        {/* Welcome banner skeleton */}
+        <div className="h-24 bg-card border border-border p-6 rounded-3xl flex flex-col justify-center space-y-2">
+          <div className="h-5 bg-secondary dark:bg-slate-800 rounded w-1/4" />
+          <div className="h-3.5 bg-secondary/70 dark:bg-slate-800/70 rounded w-1/2" />
+        </div>
+
+        {/* Metrics Grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-card border border-border p-6 rounded-3xl flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-secondary dark:bg-slate-800 shrink-0" />
+              <div className="space-y-2 flex-1">
+                <div className="h-2.5 bg-secondary/60 dark:bg-slate-800/60 rounded w-16" />
+                <div className="h-5 bg-secondary dark:bg-slate-800 rounded w-24" />
+                <div className="h-2 bg-secondary/40 dark:bg-slate-800/40 rounded w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart Panel & Sidebar skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-card border border-border p-6 rounded-3xl h-[350px] flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="h-4.5 bg-secondary dark:bg-slate-800 rounded w-1/3" />
+              <div className="h-3 bg-secondary/65 dark:bg-slate-800/65 rounded w-1/2" />
+            </div>
+            <div className="h-[240px] bg-secondary/30 dark:bg-slate-800/20 rounded-xl" />
+          </div>
+
+          <div className="bg-card border border-border p-6 rounded-3xl h-[350px] flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="h-4.5 bg-secondary dark:bg-slate-800 rounded w-1/2" />
+              <div className="h-3 bg-secondary/65 dark:bg-slate-800/65 rounded w-2/3" />
+            </div>
+            <div className="space-y-3 mt-4 flex-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex justify-between items-center py-1">
+                  <div className="space-y-1.5 flex-1 pr-4">
+                    <div className="h-3.5 bg-secondary dark:bg-slate-800 rounded w-2/3" />
+                    <div className="h-2.5 bg-secondary/50 dark:bg-slate-800/50 rounded w-1/2" />
+                  </div>
+                  <div className="h-5 bg-secondary dark:bg-slate-800 rounded w-12" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom tables/recent logs skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {Array.from({ length: 2 }).map((_, colIdx) => (
+            <div key={colIdx} className="bg-card border border-border p-6 rounded-3xl space-y-4">
+              <div className="space-y-1.5">
+                <div className="h-4 bg-secondary dark:bg-slate-800 rounded w-1/3" />
+                <div className="h-3 bg-secondary/60 dark:bg-slate-800/60 rounded w-1/2" />
+              </div>
+              <div className="space-y-3.5 pt-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center py-2 border-b border-border/40 last:border-0">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-3.5 bg-secondary dark:bg-slate-800 rounded w-1/2" />
+                      <div className="h-2.5 bg-secondary/50 dark:bg-slate-800/50 rounded w-1/3" />
+                    </div>
+                    <div className="h-4 bg-secondary dark:bg-slate-800 rounded w-14" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
