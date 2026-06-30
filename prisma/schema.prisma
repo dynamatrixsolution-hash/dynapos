@@ -27,6 +27,7 @@ model Business {
   branches         Branch[]
   users            User[]
   categories       Category[]
+  subcategories    Subcategory[]
   brands           Brand[]
   units            Unit[]
   products         Product[]
@@ -128,7 +129,8 @@ model Category {
   updatedAt  DateTime   @updatedAt
   deletedAt  DateTime?
 
-  products   Product[]
+  products      Product[]
+  subcategories Subcategory[]
 }
 
 model Brand {
@@ -138,6 +140,20 @@ model Brand {
   name       String
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+
+  products   Product[]
+}
+
+model Subcategory {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
   products   Product[]
@@ -161,6 +177,8 @@ model Product {
   business       Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   categoryId     String?
   category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subcategoryId  String?
+  subcategory    Subcategory?   @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
   brandId        String?
   brand          Brand?         @relation(fields: [brandId], references: [id], onDelete: SetNull)
   unitId         String?
@@ -176,6 +194,7 @@ model Product {
   image          String?
   batchTracking  Boolean        @default(false)
   expiryTracking Boolean        @default(false)
+  isVatItem      Boolean        @default(true)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   deletedAt      DateTime?

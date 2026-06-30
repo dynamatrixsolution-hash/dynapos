@@ -52,6 +52,7 @@ export default function DailyReportsPage() {
   const [selectedBranch, setSelectedBranch] = React.useState<string>("");
   const [selectedCashier, setSelectedCashier] = React.useState<string>("");
   const [dateStr, setDateStr] = React.useState<string>("");
+  const [mounted, setMounted] = React.useState(false);
 
   const [branches, setBranches] = React.useState<any[]>([]);
   const [cashiers, setCashiers] = React.useState<any[]>([]);
@@ -60,6 +61,7 @@ export default function DailyReportsPage() {
 
   // Default to today
   React.useEffect(() => {
+    setMounted(true);
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, "0");
@@ -455,7 +457,7 @@ export default function DailyReportsPage() {
       {/* Print details header */}
       <div className="hidden print:block border-b-2 border-[#2563EB] pb-3 mb-5">
         <h1 className="text-2xl font-black text-[#2563EB]">DynaPOS Daily Audit</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Date preset: {dateStr} | Generated: {new Date().toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Date preset: {dateStr} | Generated: {mounted ? new Date().toLocaleString() : ""}</p>
       </div>
 
       {/* 2. Tabs Selector */}

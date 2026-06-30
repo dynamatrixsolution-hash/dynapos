@@ -14,6 +14,7 @@ const productUpdateSchema = z.object({
   wholesalePrice: z.number().nonnegative().optional(),
   alertQuantity: z.number().int().nonnegative().optional(),
   categoryId: z.string().uuid().optional().nullable(),
+  subcategoryId: z.string().uuid().optional().nullable(),
   brandId: z.string().uuid().optional().nullable(),
   unitId: z.string().uuid().optional().nullable(),
   batchTracking: z.boolean().optional(),
@@ -39,6 +40,7 @@ export async function GET(
       },
       include: {
         category: true,
+        subcategory: true,
         brand: true,
         unit: true,
         productStocks: {

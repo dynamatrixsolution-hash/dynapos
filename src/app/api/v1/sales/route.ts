@@ -128,23 +128,35 @@ export async function POST(request: Request) {
       const salesPrefix = settings.salesPrefix || settings.invoicePrefix || "INV";
 
       // 2. Generate Unique Invoice Number
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const day = String(today.getDate()).padStart(2, "0");
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
       const dateStr = `${year}${month}${day}`;
+
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
       const countToday = await tx.sale.count({
         where: {
           businessId: context.businessId,
           createdAt: {
-            gte: new Date(today.setHours(0, 0, 0, 0)),
-            lte: new Date(today.setHours(23, 59, 59, 999)),
+            gte: startOfDay,
+            lte: endOfDay,
           },
         },
       });
 
-      const invoiceNumber = `${salesPrefix}-${dateStr}-${String(countToday + 1).padStart(4, "0")}`;
+      let sequence = countToday + 1;
+      let invoiceNumber = `${salesPrefix}-${dateStr}-${String(sequence).padStart(4, "0")}`;
+
+      // Ensure zero invoice number collision
+      let existingSale = await tx.sale.findUnique({ where: { invoiceNumber } });
+      while (existingSale) {
+        sequence++;
+        invoiceNumber = `${salesPrefix}-${dateStr}-${String(sequence).padStart(4, "0")}`;
+        existingSale = await tx.sale.findUnique({ where: { invoiceNumber } });
+      }
 
       // 3. Process Stock Deductions & Alerts
       const saleItemsData = [];
@@ -341,7 +353,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json(saleResult, { status: 201 });
   } catch (error: any) {
-    console.error("POST sale error:", error.message);
-    return NextResponse.json({ error: error.message || "Failed to process sale" }, { status: 500 });
+    console.error("POST sale error:", error.message || error);
+    let errorMessage = error.message || "Failed to process sale";
+    if (errorMessage.includes("Unique constraint failed") || errorMessage.includes("invoiceNumber")) {
+      errorMessage = "Invoice number collision detected. Please try completing checkout again.";
+    } else if (errorMessage.includes("PrismaClient") || errorMessage.includes("invocation")) {
+      errorMessage = "Transaction processing error. Please verify order items and try again.";
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 }

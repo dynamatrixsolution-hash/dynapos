@@ -43,6 +43,8 @@ import {
   ShieldCheck,
   Package,
   Camera,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 
 interface ProductItem {
@@ -309,6 +311,7 @@ export default function POSPage() {
   const [amountTendered, setAmountTendered] = React.useState<number>(0);
   const [isAmountTenderedManuallySet, setIsAmountTenderedManuallySet] = React.useState<boolean>(false);
   const [submitError, setSubmitError] = React.useState<string>("");
+  const [isCheckingOut, setIsCheckingOut] = React.useState(false);
   const [lastInvoice, setLastInvoice] = React.useState<any | null>(null);
 
   // Sync amountTendered with grandTotal until user edits it manually
@@ -740,6 +743,7 @@ export default function POSPage() {
       splitPayments: splitPaymentsList.length > 0 ? splitPaymentsList : undefined,
     };
 
+    setIsCheckingOut(true);
     try {
       const res = await fetch("/api/v1/sales", {
         method: "POST",
@@ -785,6 +789,8 @@ export default function POSPage() {
       }, 300);
     } catch (_) {
       setSubmitError("API Connection failure.");
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
@@ -2161,12 +2167,14 @@ export default function POSPage() {
               </div>
               <button
                 onClick={() => setPayModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                disabled={isCheckingOut}
+                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
             </div>
 
+            <fieldset disabled={isCheckingOut} className="space-y-4 flex flex-col h-full border-0 p-0 m-0">
             {/* Total Payable Banner */}
             <div className="bg-[#F3F4F6] dark:bg-slate-950 border border-slate-200/50 dark:border-slate-800 rounded-2xl p-4 flex justify-between items-center select-none">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Payable</span>
@@ -2447,17 +2455,27 @@ export default function POSPage() {
               </div>
             )}
 
-            {/* Error alerts inside the modal */}
+            {/* Popup Alert Modal for Checkout Errors */}
             {submitError && (
-              <div className="bg-red-50 dark:bg-red-950/40 text-red-650 dark:text-red-400 text-[11px] font-bold p-3 rounded-2xl border border-red-200 dark:border-red-900/50 flex justify-between items-start gap-2 text-left shrink-0">
-                <span>{submitError}</span>
-                <button
-                  type="button"
-                  onClick={() => setSubmitError("")}
-                  className="text-red-400 hover:text-red-650 font-black text-xs cursor-pointer shrink-0"
-                >
-                  ×
-                </button>
+              <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                <div className="bg-white dark:bg-slate-900 border-2 border-red-500/30 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center gap-4 animate-in zoom-in-95 duration-200">
+                  <div className="w-12 h-12 rounded-2xl bg-red-500/10 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                    <AlertTriangle className="h-6 w-6 stroke-[2.5]" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-base font-black text-slate-800 dark:text-slate-100">Checkout Notice</h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-semibold">
+                      {submitError}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSubmitError("")}
+                    className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    OK, Got It
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2466,19 +2484,27 @@ export default function POSPage() {
               <button
                 type="button"
                 onClick={() => setPayModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-xs rounded-lg hover:bg-slate-100 dark:hover:bg-slate-850 font-bold cursor-pointer"
+                className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-xs rounded-lg hover:bg-slate-100 dark:hover:bg-slate-850 font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleCheckoutSubmit}
-                disabled={splitType === "METHOD" && remainingOrChange < 0}
-                className="px-5 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 text-white text-xs font-bold rounded-lg shadow-md cursor-pointer animate-in duration-150"
+                disabled={isCheckingOut || (splitType === "METHOD" && remainingOrChange < 0)}
+                className="px-5 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 text-white text-xs font-bold rounded-lg shadow-md cursor-pointer disabled:cursor-not-allowed animate-in duration-150 flex items-center justify-center gap-1.5 min-w-[140px]"
               >
-                Complete Checkout
+                {isCheckingOut ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Complete Checkout"
+                )}
               </button>
             </div>
+            </fieldset>
 
           </div>
         </div>

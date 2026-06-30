@@ -14,6 +14,7 @@ const productCreateSchema = z.object({
   wholesalePrice: z.number().nonnegative().default(0),
   alertQuantity: z.number().int().nonnegative().default(5),
   categoryId: z.string().uuid().optional().nullable(),
+  subcategoryId: z.string().uuid().optional().nullable(),
   brandId: z.string().uuid().optional().nullable(),
   unitId: z.string().uuid().optional().nullable(),
   batchTracking: z.boolean().default(false),
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const categoryId = searchParams.get("categoryId");
+  const subcategoryId = searchParams.get("subcategoryId");
   const brandId = searchParams.get("brandId");
   const lowStock = searchParams.get("lowStock") === "true";
   
@@ -62,6 +64,10 @@ export async function GET(request: Request) {
       where.categoryId = categoryId;
     }
 
+    if (subcategoryId && subcategoryId !== "all") {
+      where.subcategoryId = subcategoryId;
+    }
+
     if (brandId && brandId !== "all") {
       where.brandId = brandId;
     }
@@ -83,6 +89,7 @@ export async function GET(request: Request) {
         where,
         include: {
           category: true,
+          subcategory: true,
           brand: true,
           unit: true,
           productStocks: {

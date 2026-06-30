@@ -157,6 +157,24 @@ export default function TransactionReportsPage() {
     doc.save(`transactions_${activeTab}.pdf`);
   };
 
+  const formatDateTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dateFormatted = d.toISOString().split("T")[0];
+    const timeFormatted = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+    return { date: dateFormatted, time: timeFormatted };
+  };
+
+  const formatMethod = (method?: string, fallback = "Cash") => {
+    if (!method) return fallback;
+    const m = method.toUpperCase();
+    if (m === "CASH") return "Cash";
+    if (m === "QR") return "E-Sewa";
+    if (m === "BANK_TRANSFER") return "Bank Transfer";
+    if (m === "CARD") return "Card";
+    if (m === "CREDIT") return "Credit";
+    return method;
+  };
+
   const renderTable = () => {
     if (items.length === 0) {
       return (
@@ -170,32 +188,33 @@ export default function TransactionReportsPage() {
       return (
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[9px] tracking-wider">
-              <th className="py-2.5 px-3">Invoice No</th>
-              <th className="py-2.5 px-3">Customer</th>
-              <th className="py-2.5 px-3 text-right">Tax</th>
-              <th className="py-2.5 px-3 text-right">Discount</th>
-              <th className="py-2.5 px-3 text-right">Total</th>
-              <th className="py-2.5 px-3 text-center">Status</th>
-              <th className="py-2.5 px-3">Date</th>
+            <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+              <th className="py-4 px-6">DATE | TIME</th>
+              <th className="py-4 px-6">INVOICE NO</th>
+              <th className="py-4 px-6">CUSTOMER</th>
+              <th className="py-4 px-6">METHOD</th>
+              <th className="py-4 px-6 text-right">AMOUNT</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/50">
-                <td className="py-2.5 px-3 font-extrabold">{item.invoiceNumber}</td>
-                <td className="py-2.5 px-3">{item.customer?.name || "Walk-in Customer"}</td>
-                <td className="py-2.5 px-3 text-right">{currencySymbol}{(item.tax ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-right">{currencySymbol}{(item.discount ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-right font-bold text-[#2563EB]">{currencySymbol}{(item.total ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-center">
-                  <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/10 text-emerald-600">
-                    {item.status}
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-950">
+            {items.map((item) => {
+              const { date, time } = formatDateTime(item.createdAt);
+              const method = formatMethod(item.payments?.[0]?.method || item.paymentMethod);
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{date}</div>
+                    <div className="text-[10px] text-slate-400 font-medium mt-0.5">{time}</div>
+                  </td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.invoiceNumber}</td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.customer?.name || "Walk-in Customer"}</td>
+                  <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400">{method}</td>
+                  <td className="py-4 px-6 text-right font-black text-slate-900 dark:text-white text-sm">
+                    {currencySymbol} {(item.total ?? 0).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       );
@@ -205,30 +224,32 @@ export default function TransactionReportsPage() {
       return (
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[9px] tracking-wider">
-              <th className="py-2.5 px-3">PO Number</th>
-              <th className="py-2.5 px-3">Supplier</th>
-              <th className="py-2.5 px-3 text-right">Total</th>
-              <th className="py-2.5 px-3 text-right">Paid</th>
-              <th className="py-2.5 px-3 text-center">Payment Status</th>
-              <th className="py-2.5 px-3">Date</th>
+            <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+              <th className="py-4 px-6">DATE | TIME</th>
+              <th className="py-4 px-6">PO NO</th>
+              <th className="py-4 px-6">SUPPLIER</th>
+              <th className="py-4 px-6">STATUS</th>
+              <th className="py-4 px-6 text-right">AMOUNT</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/50">
-                <td className="py-2.5 px-3 font-extrabold">{item.purchaseNumber}</td>
-                <td className="py-2.5 px-3">{item.supplier?.name || "N/A"}</td>
-                <td className="py-2.5 px-3 text-right font-bold">{currencySymbol}{(item.total ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-right text-emerald-600">{currencySymbol}{(item.paidAmount ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-center">
-                  <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-blue-500/10 text-blue-650">
-                    {item.paymentStatus}
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-950">
+            {items.map((item) => {
+              const { date, time } = formatDateTime(item.createdAt);
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{date}</div>
+                    <div className="text-[10px] text-slate-400 font-medium mt-0.5">{time}</div>
+                  </td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.purchaseNumber}</td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.supplier?.name || "N/A"}</td>
+                  <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400">{item.paymentStatus}</td>
+                  <td className="py-4 px-6 text-right font-black text-slate-900 dark:text-white text-sm">
+                    {currencySymbol} {(item.total ?? 0).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       );
@@ -238,34 +259,33 @@ export default function TransactionReportsPage() {
       return (
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase text-[9px] tracking-wider">
-              <th className="py-2.5 px-3">Receipt / Voucher</th>
-              <th className="py-2.5 px-3">Party Name</th>
-              <th className="py-2.5 px-3 text-right">Amount</th>
-              <th className="py-2.5 px-3 text-center">Method</th>
-              <th className="py-2.5 px-3 text-center">Type</th>
-              <th className="py-2.5 px-3">Date</th>
+            <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+              <th className="py-4 px-6">DATE | TIME</th>
+              <th className="py-4 px-6">RECEIPT NO</th>
+              <th className="py-4 px-6">PARTY</th>
+              <th className="py-4 px-6">METHOD</th>
+              <th className="py-4 px-6 text-right">AMOUNT</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/50">
-                <td className="py-2.5 px-3 font-extrabold">{item.receiptNumber}</td>
-                <td className="py-2.5 px-3">{item.customer?.name || item.supplier?.name || "Walk-in Customer"}</td>
-                <td className="py-2.5 px-3 text-right font-bold">{currencySymbol}{(item.amount ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-center">
-                  <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-slate-100 dark:bg-slate-800">
-                    {item.method}
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 text-center">
-                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black ${item.type === "RECEIVED" ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-500"}`}>
-                    {item.type}
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-950">
+            {items.map((item) => {
+              const { date, time } = formatDateTime(item.createdAt);
+              const method = formatMethod(item.method);
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{date}</div>
+                    <div className="text-[10px] text-slate-400 font-medium mt-0.5">{time}</div>
+                  </td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.receiptNumber || "—"}</td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.customer?.name || item.supplier?.name || "Walk-in Customer"}</td>
+                  <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400">{method}</td>
+                  <td className="py-4 px-6 text-right font-black text-slate-900 dark:text-white text-sm">
+                    {currencySymbol} {(item.amount ?? 0).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       );
@@ -275,24 +295,32 @@ export default function TransactionReportsPage() {
       return (
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-850 text-slate-500 font-bold uppercase text-[9px] tracking-wider">
-              <th className="py-2.5 px-3">Reference No</th>
-              <th className="py-2.5 px-3">Category</th>
-              <th className="py-2.5 px-3 text-right">Amount</th>
-              <th className="py-2.5 px-3">Description</th>
-              <th className="py-2.5 px-3">Date</th>
+            <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+              <th className="py-4 px-6">DATE | TIME</th>
+              <th className="py-4 px-6">REF NO</th>
+              <th className="py-4 px-6">CATEGORY</th>
+              <th className="py-4 px-6">DESCRIPTION</th>
+              <th className="py-4 px-6 text-right">AMOUNT</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50/50">
-                <td className="py-2.5 px-3 font-extrabold">{item.reference || "N/A"}</td>
-                <td className="py-2.5 px-3 font-semibold">{item.category?.name || "Other"}</td>
-                <td className="py-2.5 px-3 text-right font-bold text-red-500">{currencySymbol}{(item.amount ?? 0).toFixed(2)}</td>
-                <td className="py-2.5 px-3 text-slate-500 truncate max-w-[200px]">{item.description || "—"}</td>
-                <td className="py-2.5 px-3 text-slate-400 font-medium">{new Date(item.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-950">
+            {items.map((item) => {
+              const { date, time } = formatDateTime(item.createdAt);
+              return (
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{date}</div>
+                    <div className="text-[10px] text-slate-400 font-medium mt-0.5">{time}</div>
+                  </td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.reference || "—"}</td>
+                  <td className="py-4 px-6 font-semibold text-slate-700 dark:text-slate-300">{item.category?.name || "Other"}</td>
+                  <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400 truncate max-w-[200px]">{item.description || "—"}</td>
+                  <td className="py-4 px-6 text-right font-black text-slate-900 dark:text-white text-sm">
+                    {currencySymbol} {(item.amount ?? 0).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       );
