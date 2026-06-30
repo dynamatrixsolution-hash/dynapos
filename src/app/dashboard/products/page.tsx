@@ -95,7 +95,7 @@ export default function ProductsPage() {
     title: string;
     message: string;
     type: "info" | "error" | "confirm";
-    onConfirm?: () => void;
+    onConfirm?: () => void | Promise<void>;
   }
   const [alertModal, setAlertModal] = React.useState<AlertModalState>({
     open: false,
@@ -103,6 +103,7 @@ export default function ProductsPage() {
     message: "",
     type: "info",
   });
+  const [alertModalLoading, setAlertModalLoading] = React.useState(false);
 
   const showAlert = (title: string, message: string, type: "info" | "error" = "info") => {
     setAlertModal({
@@ -306,6 +307,7 @@ export default function ProductsPage() {
 
           if (res.ok) {
             loadData();
+            setAlertModal((prev) => ({ ...prev, open: false }));
           } else {
             showAlert("Error", "Failed to delete product.", "error");
           }
@@ -1254,20 +1256,36 @@ export default function ProductsPage() {
                 <>
                   <button
                     type="button"
+                    disabled={alertModalLoading}
                     onClick={() => setAlertModal((prev) => ({ ...prev, open: false }))}
-                    className="flex-1 py-2.5 border border-border text-xs rounded-xl hover:bg-secondary font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+                    className="flex-1 py-2.5 border border-border text-xs rounded-xl hover:bg-secondary font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAlertModal((prev) => ({ ...prev, open: false }));
-                      if (alertModal.onConfirm) alertModal.onConfirm();
+                    disabled={alertModalLoading}
+                    onClick={async () => {
+                      if (alertModal.onConfirm) {
+                        setAlertModalLoading(true);
+                        try {
+                          await alertModal.onConfirm();
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setAlertModalLoading(false);
+                        }
+                      } else {
+                        setAlertModal((prev) => ({ ...prev, open: false }));
+                      }
                     }}
-                    className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                    className="flex-1 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
-                    Confirm
+                    {alertModalLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      "Confirm"
+                    )}
                   </button>
                 </>
               ) : (

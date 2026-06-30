@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Clock,
   User,
+  Loader2,
 } from "lucide-react";
 
 interface UserMeta {
@@ -135,6 +136,7 @@ export default function DashboardShellClient({
   const [branchDropdownOpen, setBranchDropdownOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
+  const [logoutLoading, setLogoutLoading] = React.useState(false);
 
   const isPosRoute = pathname === "/dashboard/pos";
   const [posSidebarOpen, setPosSidebarOpen] = React.useState(false);
@@ -568,17 +570,26 @@ export default function DashboardShellClient({
             <div className="flex gap-2.5 mt-2">
               <button
                 type="button"
+                disabled={logoutLoading}
                 onClick={() => setLogoutConfirmOpen(false)}
-                className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350"
+                className="flex-1 py-2.5 border border-slate-200 dark:border-slate-800 text-xs rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/80 font-bold transition-all cursor-pointer text-slate-700 dark:text-slate-350 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                disabled={logoutLoading}
+                onClick={async () => {
+                  setLogoutLoading(true);
+                  await signOut({ callbackUrl: "/auth/login" });
+                }}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                Log Out
+                {logoutLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  "Log Out"
+                )}
               </button>
             </div>
           </div>
